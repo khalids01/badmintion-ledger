@@ -11,3 +11,5 @@ artifacts/
 *.aab
 *.jks
 *.keystore
+
+.tauri/

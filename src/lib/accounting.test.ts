@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calculate, minor, money } from "./accounting";
-import { demo } from "./demo";
+import { demo } from "../test/ledger-fixture";
 import type { Ledger, Transaction } from "./types";
 const base: Ledger = {
   members: demo.members.slice(0, 1),

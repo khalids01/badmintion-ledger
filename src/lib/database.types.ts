@@ -14,6 +14,18 @@ export type Database = {
   };
   public: {
     Tables: {
+      application_setup: {
+        Row: {
+          singleton: boolean;
+        };
+        Insert: {
+          singleton?: boolean;
+        };
+        Update: {
+          singleton?: boolean;
+        };
+        Relationships: [];
+      };
       dues: {
         Row: {
           amount: number;
@@ -211,7 +223,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      administrator_setup_complete: { Args: never; Returns: boolean };
     };
     Enums: {
       [_ in never]: never;

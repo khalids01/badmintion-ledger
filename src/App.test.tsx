@@ -3,32 +3,90 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-vi.mock("./lib/supabase", () => ({ supabase: null }));
+import type { Ledger } from "./lib/types";
+import { demo } from "./test/ledger-fixture";
+const store = vi.hoisted(() => ({ data: null as Ledger | null }));
+vi.mock("./lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: "demo", email: "admin@example.com" } } },
+        error: null,
+      }),
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+    },
+    from: (table: keyof Ledger) => ({
+      select: () => ({
+        order: async () => ({ data: store.data![table], error: null }),
+        then: (resolve: (v: unknown) => void) =>
+          Promise.resolve({ data: store.data![table], error: null }).then(
+            resolve,
+          ),
+      }),
+      insert: async (
+        value: Record<string, unknown> | Record<string, unknown>[],
+      ) => {
+        const stamp = new Date().toISOString();
+        const list = Array.isArray(value) ? value : [value];
+        store.data = {
+          ...store.data!,
+          [table]: [
+            ...store.data![table],
+            ...list.map((v) => ({
+              id: crypto.randomUUID(),
+              created_at: stamp,
+              updated_at: stamp,
+              voided_at: null,
+              ...v,
+            })),
+          ],
+        };
+        return { error: null };
+      },
+      update: (value: Record<string, unknown>) => ({
+        eq: async (_key: string, id: string) => {
+          store.data = {
+            ...store.data!,
+            [table]: store.data![table].map((v) =>
+              v.id === id ? { ...v, ...value } : v,
+            ),
+          };
+          return { error: null };
+        },
+      }),
+    }),
+  },
+}));
 vi.mock("./components/ledger-chart", () => ({
   default: () => <div>Monthly chart</div>,
 }));
 import App from "./App";
-function mount() {
-  return render(
+async function mount() {
+  const result = render(
     <QueryClientProvider client={new QueryClient()}>
       <App />
     </QueryClientProvider>,
   );
+  await screen.findByText("Available Group Funds");
+  return result;
 }
 afterEach(cleanup);
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  store.data = structuredClone(demo);
 });
 describe("ledger workflows", () => {
-  it("shows transparent preview and financial summary", () => {
-    mount();
-    expect(screen.getByText(/Interactive preview/)).toBeTruthy();
+  it("loads the saved ledger without a sample mode", async () => {
+    await mount();
+    expect(screen.queryByText(/Interactive preview/)).toBeNull();
     expect(screen.getByText("Available Group Funds")).toBeTruthy();
     expect(screen.getByText("৳7,400")).toBeTruthy();
   });
   it("creates and edits a member", async () => {
     const u = userEvent.setup();
-    mount();
+    await mount();
     await u.click(screen.getAllByText("Members", { exact: true })[0]);
     await u.click(screen.getByText("Add member"));
     const dialog = screen.getByRole("dialog");
@@ -43,7 +101,7 @@ describe("ledger workflows", () => {
   });
   it("saves a contribution and updates funds", async () => {
     const u = userEvent.setup();
-    mount();
+    await mount();
     await u.click(screen.getByText("Add contribution"));
     await u.type(screen.getByLabelText("Amount (BDT)"), "500");
     await u.selectOptions(screen.getByLabelText("Member"), "m0");
@@ -54,7 +112,7 @@ describe("ledger workflows", () => {
   });
   it("assigns custom dues to a selected member", async () => {
     const u = userEvent.setup();
-    mount();
+    await mount();
     await u.click(screen.getByText("Assign dues", { exact: true }));
     await u.type(screen.getByLabelText("Default amount (BDT)"), "500");
     await u.click(screen.getByLabelText("Select all active members"));
@@ -68,7 +126,7 @@ describe("ledger workflows", () => {
   });
   it("prevents excessive loan repayment", async () => {
     const u = userEvent.setup();
-    mount();
+    await mount();
     await u.click(screen.getByText("Repay loan"));
     await u.selectOptions(screen.getByLabelText("Lender"), "m0");
     await u.type(screen.getByLabelText("Amount (BDT)"), "2500");
@@ -78,7 +136,7 @@ describe("ledger workflows", () => {
   });
   it("voids a transaction with a reason", async () => {
     const u = userEvent.setup();
-    mount();
+    await mount();
     await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
     await u.click(screen.getByText("Evening court booking"));
     await u.click(screen.getByText("Void transaction"));
@@ -102,7 +160,7 @@ describe("ledger workflows", () => {
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {});
     const u = userEvent.setup();
-    mount();
+    await mount();
     await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
     await u.click(screen.getByText("Export CSV"));
     expect(create).toHaveBeenCalledWith(expect.any(Blob));

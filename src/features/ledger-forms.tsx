@@ -299,7 +299,7 @@ export function MemberForm({
         Full name
         <input
           autoFocus
-          placeholder="e.g. Shawon Ahmed"
+          placeholder="Member’s full name"
           {...register("name")}
         />
         {errors.name && <em>{errors.name.message}</em>}

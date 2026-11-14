@@ -1,0 +1,7 @@
+{
+  "identifier": "desktop-updates",
+  "description": "Check signed desktop updates and restart after installation",
+  "windows": ["main"],
+  "platforms": ["macOS", "windows", "linux"],
+  "permissions": ["updater:default", "process:allow-restart"]
+}

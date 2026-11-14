@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      ANDROID_SIGNING_KEY_BASE64:
+        required: false
 
 permissions:
   contents: read
@@ -30,7 +40,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -46,12 +56,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - name: Install host build dependencies
         run: |
           sudo apt-get update
@@ -78,6 +88,9 @@ jobs:
         # This is a personal testing build, not a Play Store release.
         run: npm run tauri -- android build --debug --apk --target aarch64 --ci
       - name: Collect APK and checksum
+        env:
+          ANDROID_SIGNING_KEY_BASE64: ${{ github.event_name != 'pull_request' && secrets.ANDROID_SIGNING_KEY_BASE64 || '' }}
+          IS_RELEASE: ${{ inputs.release || false }}
         run: |
           mkdir -p artifacts
           mapfile -t apks < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk')
@@ -85,8 +98,21 @@ jobs:
             printf 'Expected one ARM64 APK, found %s\n' "${#apks[@]}"
             exit 1
           fi
-          cp "${apks[0]}" artifacts/badminton-ledger-arm64-debug.apk
-          (cd artifacts && sha256sum badminton-ledger-arm64-debug.apk > SHA256SUMS.txt)
+          if [ "$IS_RELEASE" = true ] && [ -z "$ANDROID_SIGNING_KEY_BASE64" ]; then
+            echo 'Missing ANDROID_SIGNING_KEY_BASE64 repository secret.'
+            exit 1
+          fi
+          if [ -n "$ANDROID_SIGNING_KEY_BASE64" ]; then
+            key="$RUNNER_TEMP/ledger-android.pk8"
+            trap 'rm -f "$key"' EXIT
+            printf '%s' "$ANDROID_SIGNING_KEY_BASE64" | base64 --decode > "$key"
+            chmod 600 "$key"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --key "$key" --cert src-tauri/android-signing.crt --out artifacts/badminton-ledger-android-arm64.apk "${apks[0]}"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose artifacts/badminton-ledger-android-arm64.apk
+          else
+            cp "${apks[0]}" artifacts/badminton-ledger-android-arm64.apk
+          fi
+          (cd artifacts && sha256sum badminton-ledger-android-arm64.apk > SHA256SUMS.txt)
       - name: Upload downloadable APK
         id: upload
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -103,7 +129,7 @@ jobs:
             echo '## Android APK ready'
             echo "[Download the APK archive]($ARTIFACT_URL)"
             echo ''
-            echo 'Unzip and install badminton-ledger-arm64-debug.apk on an ARM64 Android phone. The archive includes SHA256SUMS.txt.'
+            echo 'Unzip and install badminton-ledger-android-arm64.apk on an ARM64 Android phone. The archive includes SHA256SUMS.txt.'
             echo ''
             echo 'This APK is debug-signed for personal testing. A new runner may use a different debug key, so uninstall an older test build if Android rejects an update.'
           } >> "$GITHUB_STEP_SUMMARY"

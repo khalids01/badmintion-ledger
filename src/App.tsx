@@ -48,7 +48,9 @@ import {
   day,
   csvDownload,
 } from "./lib/accounting";
-import { demo, empty, categoryNames } from "./lib/demo";
+import { empty, categoryNames } from "./lib/ledger-defaults";
+import { ThemeControl } from "./features/theme";
+import { UpdateControl } from "./features/updates";
 import type { TablesInsert } from "./lib/database.types";
 import type { Ledger, Kind, Transaction, Member, Category } from "./lib/types";
 const nav = [
@@ -101,8 +103,6 @@ function App() {
     [recovering, setRecovering] = useState(
       window.location.hash.includes("type=recovery"),
     ),
-    [preview, setPreview] = useState(!supabase),
-    [previewData, setPreviewData] = useState<Ledger>(structuredClone(demo)),
     [edit, setEdit] = useState<Edit>(null),
     [toast, setToast] = useState(""),
     [busy, setBusy] = useState(false),
@@ -125,7 +125,6 @@ function App() {
     const { data } = supabase.auth.onAuthStateChange((event, value) => {
       if (event === "PASSWORD_RECOVERY") setRecovering(true);
       setSession(value);
-      if (value) setPreview(false);
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -146,7 +145,7 @@ function App() {
   }, [toast]);
   const query = useQuery({
     queryKey: ["ledger", session?.user.id],
-    enabled: !!session && !preview,
+    enabled: !!session,
     queryFn: async () => {
       const result = await Promise.all([
         supabase!.from("members").select("*").order("name"),
@@ -166,7 +165,7 @@ function App() {
       } as Ledger;
     },
   });
-  const data = preview ? previewData : query.data || empty,
+  const data = query.data || empty,
     totals = calculate(data),
     my = data.members.find((m) => m.is_me),
     active = data.members.filter((m) => m.is_active);
@@ -184,44 +183,18 @@ function App() {
     if (busy) return;
     setBusy(true);
     try {
-      if (!online && !preview)
+      if (!online)
         throw new Error(
           "You are offline. Reconnect and try again. Your form is preserved.",
         );
-      if (preview) {
-        const stamp = new Date().toISOString();
-        setPreviewData((prev) => ({
-          ...prev,
-          [table]: id
-            ? prev[table].map((r) =>
-                r.id === id ? { ...r, ...values, updated_at: stamp } : r,
-              )
-            : [
-                ...prev[table],
-                {
-                  id: crypto.randomUUID(),
-                  owner_id: "demo",
-                  created_at: stamp,
-                  updated_at: stamp,
-                  voided_at: null,
-                  ...values,
-                },
-              ],
-        }));
-      } else {
-        const payload = { ...values, owner_id: session!.user.id };
-        const result = id
-          ? await supabase!.from(table).update(payload).eq("id", id)
-          : await insertRecord(table, payload);
-        if (result.error) throw result.error;
-        await client.invalidateQueries({ queryKey: ["ledger"] });
-      }
+      const payload = { ...values, owner_id: session!.user.id };
+      const result = id
+        ? await supabase!.from(table).update(payload).eq("id", id)
+        : await insertRecord(table, payload);
+      if (result.error) throw result.error;
+      await client.invalidateQueries({ queryKey: ["ledger"] });
       setEdit(null);
-      setToast(
-        preview
-          ? "Saved in preview · resets when you reload"
-          : "Saved successfully",
-      );
+      setToast("Saved successfully");
     } catch (e) {
       notify(e);
     } finally {
@@ -232,31 +205,17 @@ function App() {
     if (!rows.length) return;
     setBusy(true);
     try {
-      if (preview)
-        setPreviewData((p) => ({
-          ...p,
-          dues: [
-            ...p.dues,
-            ...(rows.map((r) => ({
-              id: crypto.randomUUID(),
-              owner_id: "demo",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              voided_at: null,
-              ...r,
-            })) as Ledger["dues"]),
-          ],
-        }));
-      else {
-        const { error } = await supabase!.from("dues").insert(
+      if (!online) throw new Error("You are offline. Reconnect and try again.");
+      const { error } = await supabase!
+        .from("dues")
+        .insert(
           rows.map((r) => ({
             ...r,
             owner_id: session!.user.id,
           })) as TablesInsert<"dues">[],
         );
-        if (error) throw error;
-        await client.invalidateQueries({ queryKey: ["ledger"] });
-      }
+      if (error) throw error;
+      await client.invalidateQueries({ queryKey: ["ledger"] });
       setEdit(null);
       setToast("Dues assigned");
     } catch (e) {
@@ -392,8 +351,17 @@ function App() {
       />
     );
   }
+  if (!supabase)
+    return (
+      <div className="auth-page">
+        <section className="auth-card">
+          <h1>Connection not configured</h1>
+          <p>Set the Supabase URL and publishable key to use your ledger.</p>
+        </section>
+      </div>
+    );
   if (!authReady) return <div className="loading">Opening your ledger…</div>;
-  if (supabase && recovering)
+  if (recovering)
     return (
       <Auth
         resetMode
@@ -401,14 +369,9 @@ function App() {
           setRecovering(false);
           window.location.hash = "";
         }}
-        onPreview={() => {
-          setRecovering(false);
-          setPreview(true);
-        }}
       />
     );
-  if (supabase && !session && !preview)
-    return <Auth onPreview={() => setPreview(true)} />;
+  if (!session) return <Auth />;
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -475,11 +438,7 @@ function App() {
           <span className="top-right">
             <span className="sync">
               <span className={"status-dot " + (!online ? "offline" : "")} />
-              {preview
-                ? "Preview workspace"
-                : online
-                  ? "All changes synced"
-                  : "Offline"}
+              {online ? "Connected" : "Offline"}
             </span>
             <button
               className="icon-button"
@@ -492,31 +451,17 @@ function App() {
             >
               <CircleHelp size={19} />
             </button>
+            <ThemeControl compact />
             <span className="avatar small">{my?.name.slice(0, 1) || "A"}</span>
           </span>
         </header>
         <main>
-          {preview && (
-            <div className="preview-banner">
-              <span>
-                <Activity size={14} /> Interactive preview · sample data ·
-                changes reset on reload
-              </span>
-              {supabase ? (
-                <button onClick={() => setPreview(false)}>
-                  Sign in <ArrowRight size={13} />
-                </button>
-              ) : (
-                <span>Supabase project selection pending</span>
-              )}
-            </div>
-          )}
           {!online && (
             <div className="error-banner">
               You’re offline. Reconnect to save changes.
             </div>
           )}
-          {query.isError && !preview && (
+          {query.isError && (
             <div className="error-banner">
               Could not load your ledger: {query.error.message}
               <button onClick={() => query.refetch()}>Retry</button>
@@ -580,7 +525,7 @@ function App() {
               </button>
             </div>
           </div>
-          {!preview && !query.isLoading && data.members.length === 0 && (
+          {!query.isLoading && data.members.length === 0 && (
             <div className="onboarding panel">
               <ShieldCheck size={25} />
               <div>
@@ -599,7 +544,7 @@ function App() {
               </button>
             </div>
           )}
-          {query.isLoading && !preview ? (
+          {query.isLoading ? (
             <div className="panel loading">Loading your ledger…</div>
           ) : (
             <>
@@ -1249,7 +1194,7 @@ function App() {
                         Account email
                         <input
                           readOnly
-                          value={session?.user.email || "Preview administrator"}
+                          value={session.user.email || "Administrator"}
                         />
                       </label>
                       <label>
@@ -1280,15 +1225,8 @@ function App() {
                           Log out
                         </button>
                       )}
-                      {preview && (
-                        <p className="form-hint">
-                          Preview data is temporary. Connect an active Supabase
-                          project and sign in to keep your real records.
-                        </p>
-                      )}
-                      <p className="form-hint">
-                        Badminton Ledger · Version 1.0.0
-                      </p>
+                      <ThemeControl />
+                      <UpdateControl />
                     </div>
                   </section>
                   <section className="panel">

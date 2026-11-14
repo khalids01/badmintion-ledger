@@ -1,22 +1,7 @@
-import type { Ledger, Transaction } from "./types";
-import { today } from "./accounting";
+import type { Ledger, Transaction } from "../lib/types";
+import { today } from "../lib/accounting";
+import { categoryNames } from "../lib/ledger-defaults";
 const now = today() + "T12:00:00+06:00";
-export const categoryNames = [
-  "Court / Venue",
-  "Shuttlecocks",
-  "Net & Equipment",
-  "Tape & Accessories",
-  "Lighting / Electricity",
-  "Repairs & Maintenance",
-  "Tournament / Entry Fees",
-  "Other",
-];
-export const empty: Ledger = {
-  members: [],
-  expense_categories: [],
-  dues: [],
-  transactions: [],
-};
 const members = [
   "Shawon Ahmed",
   "Rakib Hasan",

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Badminton Ledger",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "identifier": "com.badmintonledger.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://wjrlgcvyefbewkkwnvlv.supabase.co wss://wjrlgcvyefbewkkwnvlv.supabase.co ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; script-src 'self'; object-src 'none'; base-uri 'self'"
+      "csp": "default-src 'self'; connect-src 'self' https://api.github.com https://wjrlgcvyefbewkkwnvlv.supabase.co wss://wjrlgcvyefbewkkwnvlv.supabase.co ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; script-src 'self'; object-src 'none'; base-uri 'self'"
     }
   },
   "bundle": {
@@ -37,6 +37,14 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE4MzI0NkVBNEIzREY0MkUKUldRdTlEMUw2a1l5R0VsOFFURzdMU1FPdUE3OGF0bGNqaWlROHZUY3BPbHpYN3pJbi9CSXdML1IK",
+      "endpoints": [
+        "https://github.com/khalids01/badmintion-ledger/releases/latest/download/latest.json"
+      ]
     }
   }
 }
