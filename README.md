@@ -4,7 +4,13 @@ Track your badminton group’s contributions, expenses, dues, and loans in Bangl
 
 ## Downloads
 
-[Releases](https://github.com/khalids01/badmintion-ledger/releases) · [Android APKs](https://github.com/khalids01/badmintion-ledger/actions/workflows/android-apk.yml) · [Mac installers](https://github.com/khalids01/badmintion-ledger/actions/workflows/macos.yml)
+| Platform | Download |
+| --- | --- |
+| Android · ARM64 | [APK](https://github.com/khalids01/badmintion-ledger/releases/latest/download/badminton-ledger-android-arm64.apk) |
+| Mac · Apple Silicon | [DMG](https://github.com/khalids01/badmintion-ledger/releases/latest/download/badminton-ledger-macos-arm64.dmg) |
+| Mac · Intel | [DMG](https://github.com/khalids01/badmintion-ledger/releases/latest/download/badminton-ledger-macos-x86_64.dmg) |
+
+[All releases](https://github.com/khalids01/badmintion-ledger/releases) · [Build history](https://github.com/khalids01/badmintion-ledger/actions)
 
 For Mac, choose **arm64** for M-series or **x86_64** for Intel. Mac builds are not Apple-notarized; first launch may require approval in Privacy & Security.
 
