@@ -71,7 +71,7 @@ jobs:
           test -d "$app"
           codesign --verify --deep --strict --verbose=2 "$app"
           executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
-          lipo -verify_arch "$ARCH" "$app/Contents/MacOS/$executable"
+          lipo "$app/Contents/MacOS/$executable" -verify_arch "$ARCH"
           mkdir -p artifacts
           dmg_count=0
           while IFS= read -r -d '' dmg; do
