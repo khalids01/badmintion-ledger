@@ -1,1 +1,1 @@
-Android now uses an optimized release build with debugging symbols stripped, greatly reducing APK size. The application ID and signing certificate remain compatible with v1.1.0 so the new APK can be installed as an update.
+Android content now stays inside status-bar, navigation-bar and cutout safe areas, with branded launcher and header icons. Dark-mode secondary buttons have matching text and background colors. Expense dates are optional and default to today when blank. The home activity chart now shows weekly totals with 4-, 8- and 12-week views.

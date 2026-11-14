@@ -1,3 +1,4 @@
+import type { ActivityPoint } from "../lib/reporting";
 import {
   BarChart,
   Bar,
@@ -7,11 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-export default function LedgerChart({
-  data,
-}: {
-  data: { month: string; Contributions: number; Expenses: number }[];
-}) {
+export default function LedgerChart({ data }: { data: ActivityPoint[] }) {
   return (
     <div className="chart">
       <ResponsiveContainer width="100%" height="100%">
@@ -26,7 +23,7 @@ export default function LedgerChart({
             strokeDasharray="3 4"
           />
           <XAxis
-            dataKey="month"
+            dataKey="label"
             axisLine={false}
             tickLine={false}
             tick={{ fill: "#92949e", fontSize: 11 }}
@@ -40,6 +37,9 @@ export default function LedgerChart({
           />
           <Tooltip
             cursor={{ fill: "#f6f7f8" }}
+            labelFormatter={(label, payload) =>
+              payload?.[0]?.payload?.range || label
+            }
             formatter={(v) => "৳" + Number(v).toLocaleString()}
           />
           <Bar

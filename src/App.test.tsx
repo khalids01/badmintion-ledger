@@ -84,6 +84,16 @@ describe("ledger workflows", () => {
     expect(screen.getByText("Available Group Funds")).toBeTruthy();
     expect(screen.getByText("৳7,400")).toBeTruthy();
   });
+  it("shows weekly periods and app branding on the home screen", async () => {
+    const u = userEvent.setup();
+    await mount();
+    expect(screen.getByText(/Weekly contributions and expenses/)).toBeTruthy();
+    const selector = screen.getByLabelText("Chart weeks") as HTMLSelectElement;
+    expect(selector.value).toBe("12");
+    await u.selectOptions(selector, "4");
+    expect(selector.value).toBe("4");
+    expect(screen.getByAltText("Badminton Ledger")).toBeTruthy();
+  });
   it("creates and edits a member", async () => {
     const u = userEvent.setup();
     await mount();

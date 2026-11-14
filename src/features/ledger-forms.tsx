@@ -21,7 +21,12 @@ const txSchema = z
         return false;
       }
     }, "Enter a valid amount greater than zero"),
-    date: z.string().min(1, "Select a date"),
+    date: z
+      .string()
+      .refine(
+        (v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v),
+        "Select a valid date",
+      ),
     member_id: z.string(),
     category_id: z.string(),
     funding_source: z.enum(["group_funds", "member_personal"]),
@@ -31,6 +36,12 @@ const txSchema = z
     notes: z.string().max(2000),
   })
   .superRefine((v, ctx) => {
+    if (v.type !== "expense" && !v.date)
+      ctx.addIssue({
+        code: "custom",
+        path: ["date"],
+        message: "Select a date",
+      });
     if (
       (v.type !== "expense" || v.funding_source === "member_personal") &&
       !v.member_id
@@ -117,7 +128,7 @@ export function TransactionForm({
         onSave({
           type: v.type,
           amount: v.amount,
-          transaction_date: v.date + "T12:00:00+06:00",
+          transaction_date: (v.date || today()) + "T12:00:00+06:00",
           member_id: v.type === "expense" ? null : v.member_id,
           paid_by_member_id: personal ? v.member_id : null,
           category_id: v.type === "expense" ? v.category_id : null,
@@ -154,8 +165,9 @@ export function TransactionForm({
           {errors.amount && <em>{errors.amount.message}</em>}
         </label>
         <label>
-          Date
+          {kind === "expense" ? "Date (optional)" : "Date"}
           <input type="date" {...register("date")} />
+          {kind === "expense" && <small>Leave blank to use today.</small>}
           {errors.date && <em>{errors.date.message}</em>}
         </label>
       </div>

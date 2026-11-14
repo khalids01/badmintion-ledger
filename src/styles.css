@@ -412,7 +412,7 @@ h1 {
 }
 .button.secondary {
   border: 1px solid var(--line-e1e5e8, #e1e5e8);
-  background: white;
+  background: var(--bg-ffffff, #fff);
 }
 .button.danger {
   color: var(--text-b65555, #b65555);
@@ -1307,7 +1307,7 @@ em {
 }
 .auth-card {
   width: min(420px, 100%);
-  background: white;
+  background: var(--bg-ffffff, #fff);
   border: 1px solid var(--line-e5eae3, #e5eae3);
   border-radius: 14px;
   padding: 34px;
@@ -2312,4 +2312,96 @@ em {
   max-height: 180px;
   overflow: auto;
   margin-top: 8px;
+}
+/* Explicit foreground/background pairs keep controls readable in both themes. */
+:root {
+  --button-surface: #fff;
+  --button-text: #333944;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+:root[data-theme="dark"] {
+  --button-surface: #24362d;
+  --button-text: #e6eee8;
+}
+.button.secondary {
+  background: var(--button-surface);
+  color: var(--button-text);
+}
+.mobile-brand {
+  display: none;
+}
+.chart-period {
+  width: auto;
+  max-width: 140px;
+  min-height: 32px;
+}
+.app-shell {
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  min-height: 100dvh;
+}
+.auth-page {
+  padding-top: calc(clamp(28px, 5vw, 40px) + var(--safe-top));
+  padding-left: max(20px, var(--safe-left));
+  padding-right: max(20px, var(--safe-right));
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+.modal {
+  max-height: calc(90dvh - var(--safe-top) - var(--safe-bottom));
+  top: calc(50% + (var(--safe-top) - var(--safe-bottom)) / 2);
+}
+@media (max-width: 680px) {
+  .mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12px;
+  }
+  .mobile-brand img {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+  .topbar .breadcrumb {
+    display: none;
+  }
+  .topbar {
+    padding: 0 16px;
+  }
+  .topbar .sync {
+    display: none;
+  }
+  .top-right .theme-toggle {
+    display: inline-flex;
+  }
+  .mobile-nav {
+    padding-bottom: calc(8px + var(--safe-bottom));
+    padding-left: max(4px, var(--safe-left));
+    padding-right: max(4px, var(--safe-right));
+  }
+  main {
+    padding-bottom: calc(100px + var(--safe-bottom));
+  }
+  .toast {
+    bottom: calc(85px + var(--safe-bottom));
+  }
+  .update-banner {
+    bottom: calc(82px + var(--safe-bottom));
+  }
+  .chart-panel .panel-heading {
+    align-items: flex-start;
+  }
+  .chart-panel .panel-heading p {
+    max-width: 200px;
+    line-height: 1.6;
+  }
+  .chart-period {
+    min-height: 44px;
+    max-width: 110px;
+    font-size: 9px;
+  }
 }

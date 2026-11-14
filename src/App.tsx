@@ -1,3 +1,4 @@
+import { weeklyActivity, type ActivityPoint } from "./lib/reporting";
 import { labels } from "./lib/labels";
 import {
   TransactionForm,
@@ -98,6 +99,7 @@ async function insertRecord(
 }
 function App() {
   const [page, setPage] = useState("Dashboard"),
+    [chartWeeks, setChartWeeks] = useState(12),
     [session, setSession] = useState<Session | null>(null),
     [authReady, setAuthReady] = useState(!supabase),
     [recovering, setRecovering] = useState(
@@ -206,14 +208,12 @@ function App() {
     setBusy(true);
     try {
       if (!online) throw new Error("You are offline. Reconnect and try again.");
-      const { error } = await supabase!
-        .from("dues")
-        .insert(
-          rows.map((r) => ({
-            ...r,
-            owner_id: session!.user.id,
-          })) as TablesInsert<"dues">[],
-        );
+      const { error } = await supabase!.from("dues").insert(
+        rows.map((r) => ({
+          ...r,
+          owner_id: session!.user.id,
+        })) as TablesInsert<"dues">[],
+      );
       if (error) throw error;
       await client.invalidateQueries({ queryKey: ["ledger"] });
       setEdit(null);
@@ -273,7 +273,7 @@ function App() {
     const rows = filtered.filter((t) => t.transaction_date.slice(0, 7) === key);
     const result = calculate({ ...data, transactions: rows, dues: [] });
     return {
-      month: d.toLocaleString("en", {
+      label: d.toLocaleString("en", {
         month: "short",
         year: monthCount > 12 ? "2-digit" : undefined,
       }),
@@ -281,6 +281,7 @@ function App() {
       Expenses: result.expenses / 100,
     };
   });
+  const weekly = weeklyActivity(data, chartWeeks);
   const pending = data.members
     .filter((m) => totals.members[m.id].outstanding > 0)
     .sort(
@@ -432,6 +433,10 @@ function App() {
       </aside>
       <div className="main-shell">
         <header className="topbar">
+          <span className="mobile-brand">
+            <img src="/brand.svg" alt="Badminton Ledger" />
+            <strong>Badminton Ledger</strong>
+          </span>
           <span className="breadcrumb">
             Workspace <ChevronRight size={14} /> <strong>{page}</strong>
           </span>
@@ -635,8 +640,23 @@ function App() {
                     <section className="panel chart-panel">
                       <PanelTitle
                         title="Money in, money out"
-                        subtitle="A month-by-month look at your club’s activity."
-                        right={<span className="period">Last 6 months</span>}
+                        subtitle="Weekly contributions and expenses · Monday–Sunday"
+                        right={
+                          <select
+                            className="period chart-period"
+                            aria-label="Chart weeks"
+                            value={chartWeeks}
+                            onChange={(e) =>
+                              setChartWeeks(Number(e.target.value))
+                            }
+                          >
+                            {[4, 8, 12].map((n) => (
+                              <option key={n} value={n}>
+                                Last {n} weeks
+                              </option>
+                            ))}
+                          </select>
+                        }
                       />
                       <div className="chart-legend">
                         <span>
@@ -648,7 +668,7 @@ function App() {
                           Expenses
                         </span>
                       </div>
-                      <Chart data={monthly} />
+                      <Chart data={weekly} />
                     </section>
                     <section className="panel dues-panel">
                       <PanelTitle
@@ -1454,11 +1474,7 @@ function Empty({ title, text }: { title: string; text: string }) {
     </div>
   );
 }
-function Chart({
-  data,
-}: {
-  data: { month: string; Contributions: number; Expenses: number }[];
-}) {
+function Chart({ data }: { data: ActivityPoint[] }) {
   return (
     <Suspense fallback={<div className="chart loading">Loading chart…</div>}>
       <LedgerChart data={data} />

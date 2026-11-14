@@ -83,6 +83,8 @@ jobs:
       - run: npm ci
       - name: Generate native Android project
         run: npm run tauri -- android init --ci --skip-targets-install
+      - name: Configure safe areas and launcher icon
+        run: node scripts/configure-android.mjs
       - name: Build optimized release APK
         env:
           CARGO_PROFILE_RELEASE_STRIP: symbols

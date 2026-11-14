@@ -26,3 +26,5 @@ Android builds use the release profile with size optimization and symbols stripp
 Existing 1.0.0 installations need one manual upgrade to gain update support. The old Android debug build also needs uninstalling once because its signing key differs from the persistent key. Supabase records remain intact.
 
 Mac builds are ad-hoc signed, not Apple-notarized. Developer ID signing and notarization require Apple credentials. Linux/Windows updater plugins are wired, but their installers are not included in this release workflow.
+
+Android projects are generated in CI. After local `tauri android init`, run `node scripts/configure-android.mjs` to install the native safe-area activity and branded launcher resources before building.
