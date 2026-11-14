@@ -1,0 +1,106 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # These are public client settings, never a Supabase service-role key.
+  # Repository variables may override the connected project for forks/environments.
+  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://wjrlgcvyefbewkkwnvlv.supabase.co' }}
+  VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_u_b8yPw2STaFIywb1t4GDg_lprxQfUY' }}
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Typecheck, lint and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  apk:
+    name: Installable Android APK (ARM64)
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install host build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - name: Install Android SDK and NDK
+        run: |
+          sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          workspaces: src-tauri -> target
+      - run: npm ci
+      - name: Generate native Android project
+        run: npm run tauri -- android init --ci --skip-targets-install
+      - name: Build signed debug APK
+        # Debug APKs are installable without uploading a private release keystore.
+        # This is a personal testing build, not a Play Store release.
+        run: npm run tauri -- android build --debug --apk --target aarch64 --ci
+      - name: Collect APK and checksum
+        run: |
+          mkdir -p artifacts
+          mapfile -t apks < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            printf 'Expected one ARM64 APK, found %s\n' "${#apks[@]}"
+            exit 1
+          fi
+          cp "${apks[0]}" artifacts/badminton-ledger-arm64-debug.apk
+          (cd artifacts && sha256sum badminton-ledger-arm64-debug.apk > SHA256SUMS.txt)
+      - name: Upload downloadable APK
+        id: upload
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: badminton-ledger-android-arm64-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Add download instructions
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            echo '## Android APK ready'
+            echo "[Download the APK archive]($ARTIFACT_URL)"
+            echo ''
+            echo 'Unzip and install badminton-ledger-arm64-debug.apk on an ARM64 Android phone. The archive includes SHA256SUMS.txt.'
+            echo ''
+            echo 'This APK is debug-signed for personal testing. A new runner may use a different debug key, so uninstall an older test build if Android rejects an update.'
+          } >> "$GITHUB_STEP_SUMMARY"

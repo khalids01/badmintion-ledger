@@ -49,3 +49,15 @@ cargo check --manifest-path src-tauri/Cargo.toml
 `supabase/tests/ledger_rls.sql` runs temporary fixtures and rolls back everything. It verifies owner isolation, cross-owner inserts and foreign keys, seeded categories, valid transaction combinations, and excessive loan repayment rejection. Run only against this project's schema using a privileged SQL connection. Test fixtures use privileged SQL provisioning inside the rolled-back transaction.
 
 The Supabase security advisor reported no findings after schema setup. UI interaction tests exercise temporary preview records; manual browser/device QA and a real email-confirmed administrator sign-in remain release checks.
+
+## Download an Android APK from GitHub
+
+Every push to `main`, pull request, and manual **Run workflow** starts **Build Android APK**. It runs type checking, lint, and tests, installs Java/Android SDK/NDK/Rust, generates the Tauri Android project, and builds an **ARM64 debug APK**.
+
+1. Open [Actions → Build Android APK](https://github.com/khalids01/badmintion-ledger/actions/workflows/android-apk.yml).
+2. Open a successful run and download **badminton-ledger-android-arm64-…** from **Artifacts** (or use the run summary download link).
+3. Unzip the archive and install `badminton-ledger-arm64-debug.apk`. Allow installation from your browser/file manager if Android requests it. The archive includes a SHA-256 checksum.
+
+Artifacts are kept for 30 days. GitHub requires signing in to download Actions artifacts. The APK is debug-signed and intended for personal testing, not Google Play distribution. Different fresh runners can generate different debug signing keys; uninstall an older test build if Android refuses an update. Uninstalling clears the local login session; your financial records remain in Supabase.
+
+The workflow supplies the connected project's public Supabase URL and publishable key. Optional repository **Variables** `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` override these defaults. No service-role key, account password, or private release signing key is needed. `.env` stays ignored.

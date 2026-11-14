@@ -5,3 +5,9 @@ dist/
 !.env.example
 src-tauri/target/
 src-tauri/gen/
+supabase/.temp/
+artifacts/
+*.apk
+*.aab
+*.jks
+*.keystore
