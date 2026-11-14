@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { render, screen, cleanup, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Ledger } from "./lib/types";
 import { demo } from "./test/ledger-fixture";
-const store = vi.hoisted(() => ({ data: null as Ledger | null }));
+const store = vi.hoisted(() => ({
+  data: null as Ledger | null,
+  status: "active",
+  admin: true,
+  reads: 0,
+}));
 vi.mock("./lib/supabase", () => ({
   supabase: {
     auth: {
@@ -17,46 +22,56 @@ vi.mock("./lib/supabase", () => ({
         data: { subscription: { unsubscribe: () => {} } },
       }),
     },
-    from: (table: keyof Ledger) => ({
-      select: () => ({
-        order: async () => ({ data: store.data![table], error: null }),
-        then: (resolve: (v: unknown) => void) =>
-          Promise.resolve({ data: store.data![table], error: null }).then(
-            resolve,
-          ),
-      }),
-      insert: async (
-        value: Record<string, unknown> | Record<string, unknown>[],
-      ) => {
-        const stamp = new Date().toISOString();
-        const list = Array.isArray(value) ? value : [value];
-        store.data = {
-          ...store.data!,
-          [table]: [
-            ...store.data![table],
-            ...list.map((v) => ({
-              id: crypto.randomUUID(),
-              created_at: stamp,
-              updated_at: stamp,
-              voided_at: null,
-              ...v,
-            })),
-          ],
-        };
-        return { error: null };
-      },
-      update: (value: Record<string, unknown>) => ({
-        eq: async (_key: string, id: string) => {
+    rpc: async (name: string) => ({
+      data:
+        name === "account_access"
+          ? { status: store.status, is_admin: store.admin, owner_id: "demo" }
+          : { signup_enabled: false, users: [] },
+      error: null,
+    }),
+    from: (table: keyof Ledger) => {
+      store.reads++;
+      return {
+        select: () => ({
+          order: async () => ({ data: store.data![table], error: null }),
+          then: (resolve: (v: unknown) => void) =>
+            Promise.resolve({ data: store.data![table], error: null }).then(
+              resolve,
+            ),
+        }),
+        insert: async (
+          value: Record<string, unknown> | Record<string, unknown>[],
+        ) => {
+          const stamp = new Date().toISOString();
+          const list = Array.isArray(value) ? value : [value];
           store.data = {
             ...store.data!,
-            [table]: store.data![table].map((v) =>
-              v.id === id ? { ...v, ...value } : v,
-            ),
+            [table]: [
+              ...store.data![table],
+              ...list.map((v) => ({
+                id: crypto.randomUUID(),
+                created_at: stamp,
+                updated_at: stamp,
+                voided_at: null,
+                ...v,
+              })),
+            ],
           };
           return { error: null };
         },
-      }),
-    }),
+        update: (value: Record<string, unknown>) => ({
+          eq: async (_key: string, id: string) => {
+            store.data = {
+              ...store.data!,
+              [table]: store.data![table].map((v) =>
+                v.id === id ? { ...v, ...value } : v,
+              ),
+            };
+            return { error: null };
+          },
+        }),
+      };
+    },
   },
 }));
 vi.mock("./components/ledger-chart", () => ({
@@ -76,6 +91,9 @@ afterEach(cleanup);
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   store.data = structuredClone(demo);
+  store.status = "active";
+  store.admin = true;
+  store.reads = 0;
 });
 describe("ledger workflows", () => {
   it("loads the saved ledger without a sample mode", async () => {
@@ -178,4 +196,52 @@ describe("ledger workflows", () => {
     expect(revoke).toHaveBeenCalledWith("blob:ledger-export");
     click.mockRestore();
   });
+});
+
+describe("club access gates", () => {
+  for (const status of ["pending", "banned"]) {
+    it(`does not fetch or show ledger data for ${status} accounts`, async () => {
+      store.status = status;
+      store.admin = false;
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <App />
+        </QueryClientProvider>,
+      );
+      await screen.findByText(
+        status === "pending" ? "Waiting for approval" : "Access suspended",
+      );
+      expect(screen.queryByText("Available Group Funds")).toBeNull();
+      expect(store.reads).toBe(0);
+    });
+  }
+  it("gives approved members a view without editing or administration controls", async () => {
+    store.admin = false;
+    await mount();
+    expect(screen.getByText("Your club’s ledger")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Add transaction" }),
+    ).toBeNull();
+    expect(screen.queryByText("Club administration")).toBeNull();
+  });
+});
+
+it("hides cached ledger data when an existing session becomes banned", async () => {
+  const client = new QueryClient();
+  render(
+    <QueryClientProvider client={client}>
+      <App />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Available Group Funds");
+  await act(async () => {
+    client.setQueryData(["account-access", "demo"], {
+      status: "banned",
+      is_admin: false,
+      owner_id: null,
+    });
+  });
+  await screen.findByText("Access suspended");
+  expect(screen.queryByText("Available Group Funds")).toBeNull();
+  expect(client.getQueryData(["ledger", "demo"])).toBeUndefined();
 });

@@ -2405,3 +2405,76 @@ em {
     font-size: 9px;
   }
 }
+
+.admin-settings {
+  grid-column: 1 / -1;
+}
+.admin-settings .panel-heading {
+  padding: 24px 24px 0;
+}
+.admin-settings .panel-heading p {
+  color: var(--text-777c86, #777c86);
+  margin-top: 8px;
+}
+.signup-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.signup-switch input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--text-217c65, #217c65);
+}
+.club-users {
+  display: grid;
+  gap: 14px;
+}
+.club-user {
+  padding: 18px;
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  border-radius: 14px;
+  display: grid;
+  gap: 16px;
+}
+.club-user small,
+.club-email,
+.club-transaction small {
+  display: block;
+  color: var(--text-777c86, #777c86);
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.club-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.club-viewer {
+  max-width: 1000px;
+  margin: auto;
+  padding: max(20px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+}
+.club-viewer-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+.club-viewer-header strong {
+  margin-right: auto;
+}
+.club-viewer main {
+  display: grid;
+  gap: 20px;
+}
+.club-transaction {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line-e2e5e9, #e2e5e9);
+}

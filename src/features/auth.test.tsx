@@ -51,6 +51,10 @@ describe("private administrator access", () => {
     });
     const u = userEvent.setup();
     render(<Auth />);
+    await u.type(
+      screen.getByLabelText("Email address"),
+      "khalids8774@gmail.com",
+    );
     await u.type(screen.getByLabelText("Password"), "test-password-123");
     await u.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Invalid login credentials")).toBeTruthy();
@@ -92,4 +96,26 @@ describe("private administrator access", () => {
     });
     expect(recovered).toHaveBeenCalled();
   });
+});
+
+it("offers regular signup only when registration is open and requires approval", async () => {
+  setupStatus.rpc.mockResolvedValue({ data: true, error: null });
+  auth.signUp.mockResolvedValue({ error: null });
+  const u = userEvent.setup();
+  render(<Auth />);
+  await u.click(
+    await screen.findByRole("button", { name: "Create an account" }),
+  );
+  const email = screen.getByLabelText("Email address") as HTMLInputElement;
+  expect(email.readOnly).toBe(false);
+  expect(email.value).toBe("");
+  await u.type(email, "new-member@example.com");
+  await u.type(screen.getByLabelText("New password"), "member-password-123");
+  await u.click(screen.getByRole("button", { name: "Create account" }));
+  expect(auth.signUp).toHaveBeenCalledWith(
+    expect.objectContaining({ email: "new-member@example.com" }),
+  );
+  expect(
+    await screen.findByText(/Club access requires administrator approval/),
+  ).toBeTruthy();
 });

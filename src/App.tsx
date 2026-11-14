@@ -8,6 +8,12 @@ import {
   VoidForm,
 } from "./features/ledger-forms";
 import { Auth } from "./features/auth";
+import {
+  loadAccess,
+  AccessScreen,
+  AdminSettings,
+  ClubViewer,
+} from "./features/club";
 import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
@@ -145,9 +151,32 @@ function App() {
       return () => clearTimeout(t);
     }
   }, [toast]);
+  const access = useQuery({
+    queryKey: ["account-access", session?.user.id],
+    enabled: !!session,
+    queryFn: loadAccess,
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: "always",
+    staleTime: 0,
+    retry: 1,
+  });
+  useEffect(() => {
+    if (access.data?.status !== "active" || access.isError) {
+      void client
+        .cancelQueries({ queryKey: ["ledger"] })
+        .then(() => client.removeQueries({ queryKey: ["ledger"] }));
+      setEdit(null);
+    }
+  }, [access.data?.status, access.isError, client]);
+  async function logout() {
+    await supabase!.auth.signOut({ scope: "local" });
+    client.clear();
+    setSession(null);
+  }
   const query = useQuery({
     queryKey: ["ledger", session?.user.id],
-    enabled: !!session,
+    enabled: !!session && access.data?.status === "active" && !access.isError,
     queryFn: async () => {
       const result = await Promise.all([
         supabase!.from("members").select("*").order("name"),
@@ -373,6 +402,27 @@ function App() {
       />
     );
   if (!session) return <Auth />;
+  if (!access.data || access.isError || access.data.status !== "active")
+    return (
+      <AccessScreen
+        status={access.isError ? "error" : access.data?.status || "loading"}
+        retry={() => void access.refetch()}
+        logout={() => void logout()}
+      />
+    );
+  if (!access.data.is_admin) {
+    if (query.isPending)
+      return <div className="loading">Loading your club…</div>;
+    if (query.isError)
+      return (
+        <AccessScreen
+          status="error"
+          retry={() => void query.refetch()}
+          logout={() => void logout()}
+        />
+      );
+    return <ClubViewer data={data} logout={() => void logout()} />;
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -1204,6 +1254,7 @@ function App() {
               )}
               {page === "Settings" && (
                 <div className="settings-grid">
+                  <AdminSettings />
                   <section className="panel">
                     <PanelTitle
                       title="Your account"

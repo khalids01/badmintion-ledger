@@ -13,6 +13,8 @@ export function Auth({
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [setup, setSetup] = useState(false),
+    [signup, setSignup] = useState(false),
+    [signupEnabled, setSignupEnabled] = useState(false),
     [setupComplete, setSetupComplete] = useState<boolean | null>(null),
     [setupError, setSetupError] = useState(false),
     [recovery, setRecovery] = useState(false),
@@ -25,6 +27,8 @@ export function Auth({
       );
       if (error) throw error;
       setSetupComplete(data);
+      const registration = await supabase!.rpc("signup_enabled");
+      setSignupEnabled(!registration.error && registration.data === true);
       if (data) setSetup(false);
     } catch {
       setSetupError(true);
@@ -48,11 +52,13 @@ export function Auth({
         <h1>
           {resetMode
             ? "Choose a new password."
-            : setup
-              ? "Set up your ledger."
-              : recovery
-                ? "Reset your password."
-                : "Welcome back."}
+            : signup
+              ? "Join your club."
+              : setup
+                ? "Set up your ledger."
+                : recovery
+                  ? "Reset your password."
+                  : "Welcome back."}
         </h1>
         <p>Your club’s finances, in one clear view.</p>
         <form
@@ -72,7 +78,7 @@ export function Auth({
                   ? await supabase!.auth.resetPasswordForEmail(email, {
                       redirectTo: window.location.origin,
                     })
-                  : setup
+                  : setup || signup
                     ? await supabase!.auth.signUp({
                         email,
                         password,
@@ -83,6 +89,12 @@ export function Auth({
                         password,
                       });
               if (result.error) throw result.error;
+              if (signup) {
+                setSignup(false);
+                setMessage(
+                  "Check your email to confirm your account, then sign in. Club access requires administrator approval.",
+                );
+              }
               if (setup) {
                 setSetupComplete(true);
                 setSetup(false);
@@ -116,14 +128,15 @@ export function Auth({
                 name="email"
                 autoComplete="email"
                 required
-                defaultValue="khalids8774@gmail.com"
+                defaultValue={setup ? "khalids8774@gmail.com" : ""}
+                key={setup ? "setup" : signup ? "signup" : "signin"}
                 readOnly={setup}
               />
             </label>
           )}
           {(!recovery || resetMode) && (
             <label htmlFor="auth-password">
-              {resetMode || setup ? "New password" : "Password"}
+              {resetMode || setup || signup ? "New password" : "Password"}
               <div className="password-field">
                 <input
                   id="auth-password"
@@ -132,7 +145,9 @@ export function Auth({
                   required
                   minLength={8}
                   autoComplete={
-                    resetMode || setup ? "new-password" : "current-password"
+                    resetMode || setup || signup
+                      ? "new-password"
+                      : "current-password"
                   }
                 />
                 <button
@@ -157,11 +172,13 @@ export function Auth({
               ? "Please wait…"
               : resetMode
                 ? "Save new password"
-                : setup
-                  ? "Create administrator account"
-                  : recovery
-                    ? "Send recovery email"
-                    : "Sign in"}
+                : signup
+                  ? "Create account"
+                  : setup
+                    ? "Create administrator account"
+                    : recovery
+                      ? "Send recovery email"
+                      : "Sign in"}
             <ArrowRight size={16} />
           </button>
         </form>
@@ -173,11 +190,27 @@ export function Auth({
               onClick={() => {
                 setRecovery(!recovery);
                 setSetup(false);
+                setSignup(false);
                 setVisible(false);
               }}
             >
               {recovery ? "Back to sign in" : "Forgot password?"}
             </button>
+            {signupEnabled && setupComplete === true && (
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={() => {
+                  setSignup(!signup);
+                  setSetup(false);
+                  setRecovery(false);
+                  setVisible(false);
+                  setMessage("");
+                }}
+              >
+                {signup ? "Back to sign in" : "Create an account"}
+              </button>
+            )}
             {setupComplete === false && (
               <button
                 className="text-button setup-button"
@@ -204,7 +237,7 @@ export function Auth({
           <UpdateControl />
         </div>
         <p className="form-hint">
-          Private administrator access. Members don’t need an account.
+          New accounts need administrator approval to access the club.
         </p>
       </section>
       <span className="auth-footer">

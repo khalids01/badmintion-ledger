@@ -4,6 +4,9 @@ begin;
 create or replace function private.only_ledger_administrator() returns trigger
 language plpgsql security invoker set search_path='' as $$begin return new;end$$;
 insert into auth.users(id,email) values ('10000000-0000-4000-8000-000000000001','ledger-test-a@example.invalid'),('10000000-0000-4000-8000-000000000002','ledger-test-b@example.invalid');
+-- The isolated fixture owns this club only inside the rolled-back transaction.
+update private.ledger_administrator set user_id='10000000-0000-4000-8000-000000000001';
+update private.club_accounts set approved_at=now() where user_id='10000000-0000-4000-8000-000000000001';
 set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
 insert into public.members(id,owner_id,name,is_me) values('20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','Test A',true);
@@ -26,8 +29,13 @@ do $$begin
  begin
  insert into public.members(owner_id,name) values('10000000-0000-4000-8000-000000000001','Intruder');raise exception 'Cross owner insert accepted';exception when insufficient_privilege then null;end;
  begin
- insert into public.dues(owner_id,member_id,title,amount) values('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','Cross owner',50);raise exception 'Cross owner FK accepted';exception when foreign_key_violation then null;end;
+ insert into public.dues(owner_id,member_id,title,amount) values('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','Cross owner',50);raise exception 'Cross owner FK accepted';exception when insufficient_privilege then null;end;
 end$$;
 reset role;
+do $$begin
+ begin
+ insert into public.dues(owner_id,member_id,title,amount) values('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','Cross owner',50);
+ raise exception 'Cross owner FK accepted';exception when foreign_key_violation then null;end;
+end$$;
 select 'PASS: ownership RLS, foreign keys, default categories, transaction constraints and loan overpayment checks' as result;
 rollback;

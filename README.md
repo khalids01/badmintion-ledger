@@ -18,6 +18,8 @@ For Mac, choose **arm64** for M-series or **x86_64** for Intel. Mac builds are n
 
 Set up the administrator account for `khalids8774@gmail.com`, confirm the email, and sign in. Setup is available only once. Add your members, assign dues, and start recording transactions.
 
+In **Settings → Club administration**, enable or disable signup, approve accounts into the club, edit names, remove membership, or ban and unban users. New accounts have no ledger access until approved. Approved members can view the shared ledger; only the administrator can edit it. Signups start disabled.
+
 The app checks for updates on startup. Check manually in **Settings → Application updates**. Appearance settings offer **Light**, **Dark**, and **System** modes.
 
 ## Development
