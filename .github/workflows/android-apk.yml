@@ -83,10 +83,13 @@ jobs:
       - run: npm ci
       - name: Generate native Android project
         run: npm run tauri -- android init --ci --skip-targets-install
-      - name: Build signed debug APK
-        # Debug APKs are installable without uploading a private release keystore.
-        # This is a personal testing build, not a Play Store release.
-        run: npm run tauri -- android build --debug --apk --target aarch64 --ci
+      - name: Build optimized release APK
+        env:
+          CARGO_PROFILE_RELEASE_STRIP: symbols
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: s
+          CARGO_PROFILE_RELEASE_LTO: thin
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+        run: npm run tauri -- android build --apk --target aarch64 --ci
       - name: Collect APK and checksum
         env:
           ANDROID_SIGNING_KEY_BASE64: ${{ github.event_name != 'pull_request' && secrets.ANDROID_SIGNING_KEY_BASE64 || '' }}
@@ -112,6 +115,30 @@ jobs:
           else
             cp "${apks[0]}" artifacts/badminton-ledger-android-arm64.apk
           fi
+          apk=artifacts/badminton-ledger-android-arm64.apk
+          badging=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk")
+          head -1 <<< "$badging"
+          if ! grep -q "package: name='com.badmintonledger.desktop.debug'" <<< "$badging"; then
+            echo 'APK application ID changed; this would break in-place updates.'
+            exit 1
+          fi
+          if grep -q '^application-debuggable' <<< "$badging"; then
+            echo 'Expected a non-debuggable release APK.'
+            exit 1
+          fi
+          python3 - <<'PYAPK'
+          from pathlib import Path
+          import zipfile
+          apk=Path('artifacts/badminton-ledger-android-arm64.apk')
+          size=apk.stat().st_size
+          print(f'APK size: {size / 1024 / 1024:.2f} MiB ({size:,} bytes)')
+          with zipfile.ZipFile(apk) as archive:
+              libraries=[entry for entry in archive.infolist() if entry.filename.startswith('lib/') and entry.filename.endswith('.so')]
+              assert libraries and all(entry.filename.startswith('lib/arm64-v8a/') for entry in libraries), 'Unexpected native ABI'
+              for entry in libraries:
+                  print(f'{entry.filename}: {entry.file_size / 1024 / 1024:.2f} MiB')
+          assert size < 25 * 1024 * 1024, 'APK unexpectedly large; investigate before publishing'
+          PYAPK
           (cd artifacts && sha256sum badminton-ledger-android-arm64.apk > SHA256SUMS.txt)
       - name: Upload downloadable APK
         id: upload
@@ -131,5 +158,5 @@ jobs:
             echo ''
             echo 'Unzip and install badminton-ledger-android-arm64.apk on an ARM64 Android phone. The archive includes SHA256SUMS.txt.'
             echo ''
-            echo 'This APK is debug-signed for personal testing. A new runner may use a different debug key, so uninstall an older test build if Android rejects an update.'
+            echo 'This is an optimized ARM64 release APK. Published releases use the persistent signing key and preserve the v1.1.0 Android app ID for in-place updates.'
           } >> "$GITHUB_STEP_SUMMARY"

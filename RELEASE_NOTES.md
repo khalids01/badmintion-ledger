@@ -1,1 +1,1 @@
-Dark mode, automatic update checks, one-time administrator setup, and password visibility controls. The sample ledger has been removed.
+Android now uses an optimized release build with debugging symbols stripped, greatly reducing APK size. The application ID and signing certificate remain compatible with v1.1.0 so the new APK can be installed as an update.

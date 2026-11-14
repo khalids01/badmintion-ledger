@@ -21,6 +21,8 @@ With GitHub CLI installed and authenticated, `./scripts/setup-update-secrets.sh`
 
 **Publish update release** builds both Mac architectures and Android. It publishes `latest.json` only after every required installer and signature is uploaded. Version tags are immutable; bump the version for another release. Branch and pull-request builds remain available as Actions artifacts. Pull-request builds never receive signing secrets.
 
+Android builds use the release profile with size optimization and symbols stripped. The Android-specific identifier retains the historical `.debug` suffix only for compatibility; release APKs are not debuggable. CI verifies the package ID, ARM64-only native libraries, and APK size before publishing.
+
 Existing 1.0.0 installations need one manual upgrade to gain update support. The old Android debug build also needs uninstalling once because its signing key differs from the persistent key. Supabase records remain intact.
 
 Mac builds are ad-hoc signed, not Apple-notarized. Developer ID signing and notarization require Apple credentials. Linux/Windows updater plugins are wired, but their installers are not included in this release workflow.
