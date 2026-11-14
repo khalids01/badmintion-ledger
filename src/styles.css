@@ -2478,3 +2478,223 @@ em {
   padding: 15px 0;
   border-bottom: 1px solid var(--line-e2e5e9, #e2e5e9);
 }
+
+/* Explain balances and actions without changing the ledger's accounting rules. */
+.balance-cards button.stat {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.balance-cards button.featured {
+  color: white;
+}
+.balance-cards button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px #0000000c;
+}
+.balance-cards button:focus-visible,
+.entry-choice:focus-visible {
+  outline: 3px solid #43a894;
+  outline-offset: 3px;
+}
+.balance-cards .stat-footer {
+  line-height: 1.6;
+  min-height: 44px;
+  align-items: start;
+}
+.balance-explainer {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  background: var(--bg-ffffff, #fff);
+  color: var(--text-777c86, #777c86);
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  padding: 14px 18px;
+  border-radius: 10px;
+  line-height: 1.65;
+  margin: 16px 0;
+}
+.balance-explainer svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.chart-note,
+.form-intro {
+  color: var(--text-777c86, #777c86);
+  line-height: 1.65;
+}
+.chart-note {
+  padding: 0 24px 20px;
+  font-size: 12px;
+}
+.entry-choices {
+  display: grid;
+  gap: 10px;
+}
+.entry-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  border-radius: 12px;
+  padding: 17px;
+  background: var(--bg-ffffff, #fff);
+  color: inherit;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.entry-choice small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-777c86, #777c86);
+  line-height: 1.5;
+}
+.member-statement {
+  display: grid;
+  gap: 20px;
+  line-height: 1.6;
+}
+.statement-status {
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  background: var(--bg-f7f8fa, #f7f8fa);
+}
+.statement-status strong {
+  font-size: 17px;
+}
+.statement-status p {
+  margin: 8px 0 0;
+}
+.statement-status.paid strong {
+  color: var(--text-217c65, #217c65);
+}
+.statement-status.unpaid strong {
+  color: var(--text-cc6d35, #a65b2c);
+}
+.statement-lines {
+  margin: 0;
+}
+.statement-lines > div,
+.fee-breakdown > div,
+.fee-preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-e2e5e9, #e2e5e9);
+}
+.statement-lines dd {
+  margin: 0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.statement-lines small {
+  display: block;
+  color: var(--text-777c86, #777c86);
+  font-size: 12px;
+  margin-top: 3px;
+}
+.statement-emphasis {
+  font-size: 16px;
+}
+.statement-history-title {
+  margin: 26px 0 12px;
+}
+.live-preview {
+  padding: 16px;
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  border-left: 4px solid #43a894;
+  background: var(--bg-f7f8fa, #f7f8fa);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.live-preview p {
+  margin: 7px 0;
+}
+.fee-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.viewer-statement {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line-e2e5e9, #e2e5e9);
+}
+.viewer-statement summary {
+  cursor: pointer;
+  line-height: 1.8;
+}
+.viewer-statement summary span {
+  display: block;
+  color: var(--text-777c86, #777c86);
+  font-size: 12px;
+}
+.viewer-statement[open] summary {
+  margin-bottom: 20px;
+}
+@media (max-width: 600px) {
+  .balance-cards .stat-label {
+    font-size: 12px;
+  }
+  .balance-cards .stat-footer {
+    font-size: 11px;
+  }
+  .balance-cards .stat-value {
+    font-size: 27px;
+  }
+  .entry-choice {
+    padding: 14px;
+  }
+  .statement-lines > div {
+    gap: 12px;
+  }
+  .chart-note {
+    padding-inline: 16px;
+  }
+}
+.tx-mobile-type {
+  display: none;
+}
+.quick-actions {
+  flex-wrap: wrap;
+}
+.quick-actions > button {
+  white-space: normal;
+  min-height: 44px;
+  min-width: 120px;
+}
+.tx-amount {
+  max-width: 150px;
+}
+.tx-amount small {
+  white-space: normal;
+  line-height: 1.5;
+  text-transform: none;
+}
+@media (max-width: 1200px) {
+  .tx-mobile-type {
+    display: inline;
+    font-weight: 600;
+  }
+}
+@media (max-width: 600px) {
+  .tx-amount {
+    max-width: 100px;
+  }
+  .tx-main strong {
+    white-space: normal;
+  }
+  .quick-actions > button {
+    min-width: 0;
+  }
+}

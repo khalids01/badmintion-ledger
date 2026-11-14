@@ -84,7 +84,7 @@ async function mount() {
       <App />
     </QueryClientProvider>,
   );
-  await screen.findByText("Available Group Funds");
+  await screen.findByText("Cash in hand");
   return result;
 }
 afterEach(cleanup);
@@ -99,15 +99,15 @@ describe("ledger workflows", () => {
   it("loads the saved ledger without a sample mode", async () => {
     await mount();
     expect(screen.queryByText(/Interactive preview/)).toBeNull();
-    expect(screen.getByText("Available Group Funds")).toBeTruthy();
+    expect(screen.getByText("Cash in hand")).toBeTruthy();
     expect(screen.getByText("৳7,400")).toBeTruthy();
   });
   it("shows weekly periods and app branding on the home screen", async () => {
     const u = userEvent.setup();
     await mount();
-    expect(screen.getByText(/Weekly contributions and expenses/)).toBeTruthy();
+    expect(screen.getByText(/Weekly cash received and spent/)).toBeTruthy();
     const selector = screen.getByLabelText("Chart weeks") as HTMLSelectElement;
-    expect(selector.value).toBe("12");
+    expect(selector.value).toBe("2");
     await u.selectOptions(selector, "4");
     expect(selector.value).toBe("4");
     expect(screen.getByAltText("Badminton Ledger")).toBeTruthy();
@@ -130,12 +130,13 @@ describe("ledger workflows", () => {
   it("saves a contribution and updates funds", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Add contribution"));
+    await u.click(screen.getByText("Someone paid money"));
     await u.type(screen.getByLabelText("Amount (BDT)"), "500");
     await u.selectOptions(screen.getByLabelText("Member"), "m0");
     await u.type(screen.getByLabelText("Description"), "Test contribution");
     await u.click(screen.getByText("Save transaction"));
     expect(screen.getByText("৳7,900")).toBeTruthy();
+    await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
     expect(screen.getByText("Test contribution")).toBeTruthy();
   });
   it("assigns custom dues to a selected member", async () => {
@@ -155,7 +156,7 @@ describe("ledger workflows", () => {
   it("prevents excessive loan repayment", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Repay loan"));
+    await u.click(screen.getByText("Repay a member"));
     await u.selectOptions(screen.getByLabelText("Lender"), "m0");
     await u.type(screen.getByLabelText("Amount (BDT)"), "2500");
     await u.click(screen.getByText("Save transaction"));
@@ -211,7 +212,7 @@ describe("club access gates", () => {
       await screen.findByText(
         status === "pending" ? "Waiting for approval" : "Access suspended",
       );
-      expect(screen.queryByText("Available Group Funds")).toBeNull();
+      expect(screen.queryByText("Cash in hand")).toBeNull();
       expect(store.reads).toBe(0);
     });
   }
@@ -233,7 +234,7 @@ it("hides cached ledger data when an existing session becomes banned", async () 
       <App />
     </QueryClientProvider>,
   );
-  await screen.findByText("Available Group Funds");
+  await screen.findByText("Cash in hand");
   await act(async () => {
     client.setQueryData(["account-access", "demo"], {
       status: "banned",
@@ -242,6 +243,33 @@ it("hides cached ledger data when an existing session becomes banned", async () 
     });
   });
   await screen.findByText("Access suspended");
-  expect(screen.queryByText("Available Group Funds")).toBeNull();
+  expect(screen.queryByText("Cash in hand")).toBeNull();
   expect(client.getQueryData(["ledger", "demo"])).toBeUndefined();
+});
+
+describe("balance explanations", () => {
+  it("opens a cash breakdown and the members the club owes", async () => {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getByRole("button", { name: /Cash in hand/ }));
+    expect(await screen.findByText("Cash received from members")).toBeTruthy();
+    await u.click(screen.getByLabelText("Close"));
+    await u.click(screen.getByRole("button", { name: /Club must repay/ }));
+    expect(await screen.findByText("Who must the club repay?")).toBeTruthy();
+  });
+  it("starts with a choice and opens the member-funded purchase form", async () => {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getByRole("button", { name: "Add transaction" }));
+    const dialog = screen.getByRole("dialog");
+    await u.click(
+      within(dialog).getByRole("button", { name: /Someone provided items/ }),
+    );
+    expect(
+      (screen.getByLabelText("Who paid?") as HTMLSelectElement).value,
+    ).toBe("member_personal");
+    expect(
+      screen.getByLabelText("Should this count as their payment or a loan?"),
+    ).toBeTruthy();
+  });
 });

@@ -4,7 +4,15 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check } from "lucide-react";
 import { calculate, minor, money, today } from "../lib/accounting";
-import type { Ledger, Kind, Transaction, Member, Category } from "../lib/types";
+import type {
+  Ledger,
+  Kind,
+  Transaction,
+  Member,
+  Category,
+  Due,
+} from "../lib/types";
+import { transactionDateLabel } from "../lib/presentation";
 import { labels } from "../lib/labels";
 const txSchema = z
   .object({
@@ -63,6 +71,7 @@ export function TransactionForm({
   data,
   type,
   record,
+  initialPersonal = false,
   busy,
   onSave,
   onVoid,
@@ -70,6 +79,7 @@ export function TransactionForm({
   data: Ledger;
   type: Kind;
   record?: Transaction;
+  initialPersonal?: boolean;
   busy: boolean;
   onSave: (v: Record<string, unknown>) => void;
   onVoid: () => void;
@@ -98,7 +108,9 @@ export function TransactionForm({
         record?.category_id ||
         data.expense_categories.filter((c) => c.is_active)[0]?.id ||
         "",
-      funding_source: record?.funding_source || "group_funds",
+      funding_source:
+        record?.funding_source ||
+        (initialPersonal ? "member_personal" : "group_funds"),
       personal_settlement: record?.personal_settlement || "contribution",
       payment_method: record?.payment_method || "cash",
       description: record?.description || "",
@@ -108,12 +120,34 @@ export function TransactionForm({
   const kind = watch("type"),
     personal =
       kind === "expense" && watch("funding_source") === "member_personal",
-    member = watch("member_id");
+    member = watch("member_id"),
+    settlement = watch("personal_settlement"),
+    amountText = watch("amount");
   const adjusted = {
       ...data,
       transactions: data.transactions.filter((t) => t.id !== record?.id),
     },
-    balance = calculate(adjusted).members[member]?.loans || 0;
+    summary = calculate(adjusted),
+    balance = summary.members[member]?.loans || 0;
+  let previewAmount = 0;
+  try {
+    previewAmount = minor(amountText);
+  } catch {
+    /* Invalid amounts are explained by field validation. */
+  }
+  const person =
+    data.members.find((m) => m.id === member)?.name || "this member";
+  const unpaid = summary.members[member]?.outstanding || 0;
+  const addsFeeCredit =
+    kind === "contribution" || (personal && settlement === "contribution");
+  const nextCash =
+    summary.funds +
+    (kind === "contribution" || kind === "loan_received"
+      ? previewAmount
+      : kind === "loan_repayment" || (kind === "expense" && !personal)
+        ? -previewAmount
+        : 0);
+
   return (
     <form
       className="form"
@@ -143,6 +177,15 @@ export function TransactionForm({
       {record?.voided_at && (
         <div className="error-banner">Voided: {record.void_reason}</div>
       )}
+      <p className="form-intro">
+        {kind === "contribution"
+          ? "Record money paid toward a member’s entry or weekly fees."
+          : kind === "loan_received"
+            ? "Record cash a member lent to the club. This does not pay their fees."
+            : kind === "loan_repayment"
+              ? "Record money the club returned to a member who lent it."
+              : "Record what was bought, who paid, and how it should count."}
+      </p>
       <label>
         Transaction type
         <select {...register("type")} aria-readonly={!!record}>
@@ -188,10 +231,12 @@ export function TransactionForm({
             {errors.category_id && <em>{errors.category_id.message}</em>}
           </label>
           <label>
-            Paid using
+            Who paid?
             <select {...register("funding_source")}>
-              <option value="group_funds">Group funds</option>
-              <option value="member_personal">Member’s personal money</option>
+              <option value="group_funds">Club cash</option>
+              <option value="member_personal">
+                A member paid / provided the items
+              </option>
             </select>
           </label>
         </>
@@ -219,20 +264,22 @@ export function TransactionForm({
       )}
       {kind === "loan_repayment" && (
         <div className="info-box">
-          Outstanding loan: <strong>{money(balance)}</strong>
+          Club still owes this member: <strong>{money(balance)}</strong>
         </div>
       )}
       {personal ? (
         <>
           <label>
-            Count this purchase as
+            Should this count as their payment or a loan?
             <select {...register("personal_settlement")}>
-              <option value="contribution">Member contribution</option>
-              <option value="loan">Loan to the group</option>
+              <option value="contribution">
+                Their entry / weekly fee payment
+              </option>
+              <option value="loan">A loan the club must repay</option>
             </select>
           </label>
           <p className="form-hint">
-            Recorded once as an expense. Group funds remain unchanged.
+            The purchase is recorded once. No money enters or leaves club cash.
           </p>
         </>
       ) : (
@@ -254,6 +301,45 @@ export function TransactionForm({
         Notes (optional)
         <textarea {...register("notes")} placeholder="Any extra details…" />
       </label>
+      {!record?.voided_at && previewAmount > 0 && (
+        <div className="live-preview" role="status">
+          <strong>After saving this entry</strong>
+          <p>
+            {personal
+              ? "No club cash moves."
+              : `Cash in hand will be ${money(nextCash)}.`}
+          </p>
+          {addsFeeCredit && member && (
+            <p>
+              {money(Math.min(previewAmount, unpaid))} clears unpaid fees for{" "}
+              {person}.{" "}
+              {previewAmount > unpaid
+                ? `${money(previewAmount - unpaid)} stays as extra fee credit. If this money must be repaid, record that part separately as a member loan.`
+                : `${money(Math.max(0, unpaid - previewAmount))} in fees will remain due.`}
+            </p>
+          )}
+          {(kind === "loan_received" || (personal && settlement === "loan")) &&
+            member && (
+              <p>
+                The club will owe {person} {money(balance + previewAmount)}.
+                Their unpaid fees stay unchanged.
+              </p>
+            )}
+          {kind === "loan_repayment" && member && (
+            <p>
+              The club will still owe {person}{" "}
+              {money(Math.max(0, balance - previewAmount))}.
+            </p>
+          )}
+        </div>
+      )}
+      {record &&
+        transactionDateLabel(record).startsWith("Original date unknown") && (
+          <p className="form-hint">
+            Original date unknown. This opening record uses its import date.
+            Choose the actual date above if you know it.
+          </p>
+        )}
       {!record?.voided_at && (
         <div className="form-actions">
           {record && (
@@ -344,17 +430,31 @@ export function MemberForm({
 }
 export function DuesForm({
   members,
+  dues = [],
   busy,
   onSave,
 }: {
   members: Member[];
+  dues?: Due[];
   busy: boolean;
   onSave: (v: Record<string, unknown>[]) => void;
 }) {
+  const weeklyTitles = [
+    ...new Set(
+      dues
+        .filter((d) => !d.voided_at && /week/i.test(d.title))
+        .map((d) => d.title),
+    ),
+  ];
+  const nextWeek =
+    Math.max(
+      weeklyTitles.length,
+      ...weeklyTitles.map((t) => Number(t.match(/week\s+(\d+)/i)?.[1] || 0)),
+    ) + 1;
   const [selected, setSelected] = useState<string[]>(members.map((m) => m.id)),
     [amount, setAmount] = useState(""),
     [custom, setCustom] = useState<Record<string, string>>({}),
-    [title, setTitle] = useState("Monthly contribution"),
+    [title, setTitle] = useState(`Weekly fee — Week ${nextWeek}`),
     [date, setDate] = useState(today()),
     [error, setError] = useState("");
   return (
@@ -382,6 +482,32 @@ export function DuesForm({
         }
       }}
     >
+      <p className="form-intro">
+        Charge fees for one named period. This does not record a payment.
+        Existing balances remain and the new charge is added.
+      </p>
+      <div className="fee-presets">
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => {
+            setTitle("Entry fee");
+            setAmount("500");
+          }}
+        >
+          Entry fee · ৳500
+        </button>
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => {
+            setTitle(`Weekly fee — Week ${nextWeek}`);
+            setAmount("100");
+          }}
+        >
+          Weekly fee · ৳100
+        </button>
+      </div>
       <label>
         Title
         <input
@@ -453,6 +579,31 @@ export function DuesForm({
         Set a different amount beside any member. Contributions determine their
         paid status automatically.
       </p>
+      <div className="live-preview">
+        <strong>Review new charges</strong>
+        <p>
+          {title} · {selected.length} selected members
+        </p>
+        {selected.map((id) => {
+          const a = custom[id] || amount;
+          let cents = 0;
+          try {
+            cents = minor(a);
+          } catch {
+            /* Await a valid amount. */
+          }
+          return (
+            <div className="fee-preview-row" key={id}>
+              <span>{members.find((m) => m.id === id)?.name}</span>
+              <strong>{cents ? money(cents) : "Enter amount"}</strong>
+            </div>
+          );
+        })}
+        <p>
+          Only press assign when the period and members above are correct. This
+          adds fees again if you assign the same period twice.
+        </p>
+      </div>
       {error && <em>{error}</em>}
       <button className="button primary" disabled={busy || !members.length}>
         {busy ? "Assigning…" : "Assign dues to " + selected.length + " members"}

@@ -1,10 +1,13 @@
 import { calculate, day, today } from "./accounting";
+import { cashMovement } from "./presentation";
 import type { Ledger } from "./types";
 export interface ActivityPoint {
   label: string;
   Contributions: number;
   Expenses: number;
   range?: string;
+  CashIn?: number;
+  CashOut?: number;
 }
 const dateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Dhaka",
@@ -17,7 +20,7 @@ export function dhakaDate(value: string) {
 }
 export function weeklyActivity(
   data: Ledger,
-  weeks = 12,
+  weeks = 2,
   through = today(),
 ): ActivityPoint[] {
   const monday = new Date(through + "T00:00:00Z");
@@ -37,7 +40,10 @@ export function weeklyActivity(
       .filter((row) => row.date >= from && row.date <= to)
       .map((row) => row.transaction);
     const totals = calculate({ ...data, transactions, dues: [] });
+    const cash = cashMovement(transactions);
     return {
+      CashIn: cash.cashIn / 100,
+      CashOut: cash.cashOut / 100,
       label: new Intl.DateTimeFormat("en-GB", {
         timeZone: "UTC",
         day: "numeric",

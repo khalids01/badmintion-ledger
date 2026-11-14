@@ -7,6 +7,12 @@ import {
   CategoryForm,
   VoidForm,
 } from "./features/ledger-forms";
+import { MemberStatement } from "./components/member-statement";
+import {
+  cashMovement,
+  transactionLabel,
+  transactionDateLabel,
+} from "./lib/presentation";
 import { Auth } from "./features/auth";
 import {
   loadAccess,
@@ -31,7 +37,6 @@ import {
   Search,
   Download,
   Wallet,
-  TrendingUp,
   Receipt,
   HandCoins,
   MoreHorizontal,
@@ -75,7 +80,15 @@ const icons = {
   loan_repayment: ArrowUpRight,
 };
 type Edit =
-  | { kind: "transaction"; type: Kind; record?: Transaction }
+  | {
+      kind: "transaction";
+      type: Kind;
+      record?: Transaction;
+      personal?: boolean;
+    }
+  | { kind: "start" }
+  | { kind: "cash" }
+  | { kind: "loans" }
   | { kind: "member"; record?: Member }
   | { kind: "dues" }
   | { kind: "category"; record?: Category }
@@ -105,7 +118,7 @@ async function insertRecord(
 }
 function App() {
   const [page, setPage] = useState("Dashboard"),
-    [chartWeeks, setChartWeeks] = useState(12),
+    [chartWeeks, setChartWeeks] = useState(2),
     [session, setSession] = useState<Session | null>(null),
     [authReady, setAuthReady] = useState(!supabase),
     [recovering, setRecovering] = useState(
@@ -198,6 +211,7 @@ function App() {
   });
   const data = query.data || empty,
     totals = calculate(data),
+    cash = cashMovement(data.transactions),
     my = data.members.find((m) => m.is_me),
     active = data.members.filter((m) => m.is_active);
   const notify = (e: unknown) =>
@@ -348,24 +362,31 @@ function App() {
               <span className="tx-main">
                 <strong>{t.description || labels[t.type]}</strong>
                 <small>
+                  <span className="tx-mobile-type">
+                    {transactionLabel(t)} ·{" "}
+                  </span>
                   {member?.name ||
                     data.expense_categories.find((c) => c.id === t.category_id)
                       ?.name ||
                     "Group funds"}{" "}
-                  <span>· {day(t.transaction_date)}</span>
+                  <span>· {transactionDateLabel(t)}</span>
                 </small>
               </span>
-              <span className="tx-type">{labels[t.type]}</span>
+              <span className="tx-type">{transactionLabel(t)}</span>
               <span className={"tx-amount " + t.type}>
-                {t.type === "contribution" || t.type === "loan_received"
-                  ? "+"
-                  : "−"}
+                {t.funding_source === "member_personal"
+                  ? ""
+                  : t.type === "contribution" || t.type === "loan_received"
+                    ? "+"
+                    : "−"}
                 {money(minor(t.amount))}
                 <small>
                   {t.voided_at
                     ? "Voided"
                     : t.funding_source === "member_personal"
-                      ? "Personal · " + t.personal_settlement
+                      ? t.personal_settlement === "contribution"
+                        ? "Fees credited · no cash moved"
+                        : "Loan added · no cash moved"
                       : (t.payment_method || "").replaceAll("_", " ")}
                 </small>
               </span>
@@ -443,7 +464,7 @@ function App() {
           <span className="club-logo">B</span>
           <div>
             <strong>Our badminton club</strong>
-            <small>Personal workspace</small>
+            <small>Club ledger</small>
           </div>
           <MoreHorizontal size={17} />
         </div>
@@ -534,7 +555,7 @@ function App() {
                     {
                       Dashboard: "Less bookkeeping. More badminton.",
                       Transactions:
-                        "Every contribution, purchase, and repayment. In one place.",
+                        "Fee payments, purchases, loans and repayments.",
                       Members: "The people who keep the game going.",
                       Dues: "Know what’s paid and what’s still to come.",
                       Reports: "A little perspective on your club’s finances.",
@@ -567,7 +588,7 @@ function App() {
                       ? { kind: "member" }
                       : page === "Dues"
                         ? { kind: "dues" }
-                        : { kind: "transaction", type: "contribution" },
+                        : { kind: "start" },
                   )
                 }
               >
@@ -605,50 +626,65 @@ function App() {
             <>
               {page === "Dashboard" && (
                 <>
-                  <div className="stats-grid">
-                    <div className="stat featured">
+                  <div className="stats-grid balance-cards">
+                    <button
+                      className="stat featured"
+                      onClick={() => setEdit({ kind: "cash" })}
+                    >
                       <div className="stat-label">
-                        Available Group Funds <Wallet size={18} />
+                        Cash in hand <Wallet size={18} />
                       </div>
                       <div className="stat-value">{money(totals.funds)}</div>
                       <div className="stat-footer">
-                        <span className="live-dot" /> Ready for the next game{" "}
-                        <ArrowUpRight size={15} />
+                        Money the club can spend now <ChevronRight size={15} />
                       </div>
-                      <div className="fund-decoration" />
-                    </div>
+                    </button>
                     {[
                       {
-                        name: "Total contributions",
-                        value: totals.collected,
-                        icon: TrendingUp,
-                        detail: "Money received from members",
-                        color: "green",
-                      },
-                      {
-                        name: "Total expenses",
-                        value: totals.expenses,
-                        icon: Receipt,
-                        detail: "Everything spent on the game",
-                        color: "orange",
-                      },
-                      {
-                        name: "Outstanding dues",
+                        name: "Members still owe",
                         value: totals.outstanding,
                         icon: Users,
-                        detail: pending.length + " members with a balance",
-                        color: "amber",
+                        detail: `${pending.length} members have unpaid fees`,
+                        action: () => go("Dues"),
+                      },
+                      {
+                        name: "Club must repay",
+                        value: totals.loans,
+                        icon: HandCoins,
+                        detail: "Money lent by members, not unpaid fees",
+                        action: () => setEdit({ kind: "loans" }),
+                      },
+                      {
+                        name: "Total spent",
+                        value: totals.expenses,
+                        icon: Receipt,
+                        detail: `${money(cash.cashExpenses)} cash + ${money(cash.memberPurchases)} member-funded`,
+                        action: () => {
+                          go("Transactions");
+                          setFilter("expense");
+                        },
                       },
                     ].map((s) => (
-                      <div className="stat" key={s.name}>
+                      <button className="stat" key={s.name} onClick={s.action}>
                         <div className="stat-label">
                           {s.name}
-                          <s.icon size={18} className={s.color} />
+                          <s.icon size={18} />
                         </div>
                         <div className="stat-value">{money(s.value)}</div>
-                        <div className="stat-footer">{s.detail}</div>
-                      </div>
+                        <div className="stat-footer">
+                          {s.detail}
+                          <ChevronRight size={15} />
+                        </div>
+                      </button>
                     ))}
+                  </div>
+                  <div className="balance-explainer">
+                    <ShieldCheck size={18} />
+                    <span>
+                      <strong>Two different directions:</strong> members owe the
+                      club unpaid fees. The club owes members money they lent.
+                      These balances do not cancel each other.
+                    </span>
                   </div>
                   <div className="quick-actions">
                     <span>QUICK ADD</span>
@@ -669,15 +705,33 @@ function App() {
                           <span className={"quick-icon " + type}>
                             <Icon size={16} />
                           </span>
-                          {type === "loan_received"
-                            ? "Receive loan"
-                            : type === "loan_repayment"
-                              ? "Repay loan"
-                              : "Add " + type}
+                          {
+                            {
+                              contribution: "Someone paid money",
+                              expense: "Club bought something",
+                              loan_received: "Member lent money",
+                              loan_repayment: "Repay a member",
+                            }[type]
+                          }
                           <Plus size={14} />
                         </button>
                       );
                     })}
+                    <button
+                      onClick={() =>
+                        setEdit({
+                          kind: "transaction",
+                          type: "expense",
+                          personal: true,
+                        })
+                      }
+                    >
+                      <span className="quick-icon expense">
+                        <Receipt size={16} />
+                      </span>
+                      Someone provided items
+                      <Plus size={14} />
+                    </button>
                     <button onClick={() => setEdit({ kind: "dues" })}>
                       <span className="quick-icon dues">
                         <ClipboardList size={16} />
@@ -689,8 +743,8 @@ function App() {
                   <div className="dashboard-columns">
                     <section className="panel chart-panel">
                       <PanelTitle
-                        title="Money in, money out"
-                        subtitle="Weekly contributions and expenses · Monday–Sunday"
+                        title="Cash in, cash out"
+                        subtitle="Weekly cash received and spent · Monday–Sunday"
                         right={
                           <select
                             className="period chart-period"
@@ -700,7 +754,7 @@ function App() {
                               setChartWeeks(Number(e.target.value))
                             }
                           >
-                            {[4, 8, 12].map((n) => (
+                            {[2, 4, 8, 12].map((n) => (
                               <option key={n} value={n}>
                                 Last {n} weeks
                               </option>
@@ -711,19 +765,23 @@ function App() {
                       <div className="chart-legend">
                         <span>
                           <i className="green-bg" />
-                          Contributions
+                          Cash received (fees + loans)
                         </span>
                         <span>
                           <i className="orange-bg" />
-                          Expenses
+                          Cash spent / repaid
                         </span>
                       </div>
-                      <Chart data={weekly} />
+                      <Chart data={weekly} cash />
+                      <p className="chart-note">
+                        Items provided by members do not move club cash. Undated
+                        opening records appear in their import week.
+                      </p>
                     </section>
                     <section className="panel dues-panel">
                       <PanelTitle
-                        title="Outstanding dues"
-                        subtitle="A friendly reminder goes a long way."
+                        title="Who still needs to pay?"
+                        subtitle="Unpaid entry and weekly fees. Loans are separate."
                         right={
                           <span className="count-pill">
                             {pending.length} members
@@ -803,28 +861,37 @@ function App() {
                           <span className="tx-icon contribution">
                             <Users size={20} />
                           </span>
-                          <span>MY CONTRIBUTION</span>
+                          <span>YOUR FEE PAYMENTS</span>
                           <span className="you-pill">You</span>
                         </div>
                         <h2>{money(my ? totals.members[my.id].credit : 0)}</h2>
-                        <p>Your share in keeping the game going.</p>
+                        <p>This counts toward your entry and weekly fees.</p>
+                        {my && (
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              setEdit({ kind: "details", member: my })
+                            }
+                          >
+                            View your statement <ArrowRight size={14} />
+                          </button>
+                        )}
                         <div>
-                          <span>Cash & personal purchases</span>
+                          <span>Cash payments + items credited</span>
                           <Check size={16} />
                         </div>
                       </section>
                       <button
                         className="panel loan-card"
                         onClick={() => {
-                          go("Transactions");
-                          setFilter("loan_received");
+                          setEdit({ kind: "loans" });
                         }}
                       >
                         <span className="tx-icon loan_received">
                           <HandCoins size={20} />
                         </span>
                         <span>
-                          <small>Outstanding loans</small>
+                          <small>Club owes members</small>
                           <strong>{money(totals.loans)}</strong>
                         </span>
                         <ChevronRight size={19} />
@@ -938,22 +1005,22 @@ function App() {
                             <p>{m.phone || "Club member"}</p>
                             <dl>
                               <div>
-                                <dt>Contribution credit</dt>
+                                <dt>Counted toward fees</dt>
                                 <dd className="green">{money(b.credit)}</dd>
                               </div>
                               <div>
-                                <dt>Total assigned dues</dt>
+                                <dt>Expected payment</dt>
                                 <dd>{money(b.assigned)}</dd>
                               </div>
                               <div>
-                                <dt>Outstanding dues</dt>
+                                <dt>Still due</dt>
                                 <dd className={b.outstanding ? "orange" : ""}>
                                   {money(b.outstanding)}
                                 </dd>
                               </div>
                               {b.loans > 0 && (
                                 <div>
-                                  <dt>Loans owed</dt>
+                                  <dt>Club owes member</dt>
                                   <dd>{money(b.loans)}</dd>
                                 </div>
                               )}
@@ -964,7 +1031,7 @@ function App() {
                                 setEdit({ kind: "details", member: m })
                               }
                             >
-                              View member <ArrowRight size={15} />
+                              View statement <ArrowRight size={15} />
                             </button>
                           </section>
                         );
@@ -982,7 +1049,7 @@ function App() {
                 <>
                   <div className="mini-stats">
                     <div className="panel">
-                      <small>Total assigned</small>
+                      <small>Total fees charged</small>
                       <h2>
                         {money(
                           Object.values(totals.members).reduce(
@@ -993,7 +1060,7 @@ function App() {
                       </h2>
                     </div>
                     <div className="panel">
-                      <small>Outstanding dues</small>
+                      <small>Still due</small>
                       <h2>{money(totals.outstanding)}</h2>
                     </div>
                     <div className="panel">
@@ -1012,7 +1079,7 @@ function App() {
                   <section className="panel">
                     <PanelTitle
                       title="Member balances"
-                      subtitle="Payments and personal contributions automatically reduce dues."
+                      subtitle="Cash fee payments and items credited toward fees reduce these balances. Loans do not."
                     />
                     {data.members.map((m, i) => {
                       const b = totals.members[m.id];
@@ -1059,8 +1126,8 @@ function App() {
                   </section>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Assigned dues"
-                      subtitle="Individual assignments, with their original dates."
+                      title="Expected payment"
+                      subtitle="Entry fees and weekly periods charged to each member."
                     />
                     {data.dues
                       .filter((d) => !d.voided_at)
@@ -1116,7 +1183,7 @@ function App() {
                   <div className="dashboard-columns">
                     <section className="panel chart-panel">
                       <PanelTitle
-                        title="Monthly contributions & expenses"
+                        title="Monthly fees received & spending"
                         subtitle="BDT · non-voided transactions"
                       />
                       <Chart data={monthly} />
@@ -1161,8 +1228,8 @@ function App() {
                   </div>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Contributions by member"
-                      subtitle="Cash and direct purchases counted as contributions · selected period"
+                      title="Fee payments by member"
+                      subtitle="Cash and member-funded purchases counted toward fees · selected period"
                     />
                     {data.members.map((m) => {
                       const txs = filtered.filter(
@@ -1186,8 +1253,8 @@ function App() {
                   </section>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Group funds history"
-                      subtitle="Running balance · personal purchases have no effect on available funds"
+                      title="Cash balance history"
+                      subtitle="Cash received minus cash spent / repaid · member-funded purchases excluded"
                     />
                     {(() => {
                       let running = 0;
@@ -1231,19 +1298,19 @@ function App() {
                   </section>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Loan history & funds movement"
+                      title="Money the club owes back"
                       subtitle="Balances include all prior activity; date filters limit displayed transactions."
                     />
                     <div className="report-summary">
                       <span>
-                        Available funds <strong>{money(totals.funds)}</strong>
+                        Cash in hand <strong>{money(totals.funds)}</strong>
                       </span>
                       <span>
-                        Loans outstanding <strong>{money(totals.loans)}</strong>
+                        Club must repay <strong>{money(totals.loans)}</strong>
                       </span>
                       {my && (
                         <span>
-                          Loans owed to you{" "}
+                          Club owes you{" "}
                           <strong>{money(totals.members[my.id].loans)}</strong>
                         </span>
                       )}
@@ -1407,30 +1474,147 @@ function App() {
       {edit && (
         <Modal
           title={
-            edit.kind === "transaction"
-              ? edit.record
-                ? "Transaction details"
-                : labels[edit.type]
-              : edit.kind === "member"
-                ? edit.record
-                  ? "Edit member"
-                  : "Add a member"
-                : edit.kind === "dues"
-                  ? "Assign dues"
-                  : edit.kind === "category"
-                    ? "Expense category"
-                    : edit.kind === "void"
-                      ? "Void transaction"
-                      : edit.member.name
+            edit.kind === "start"
+              ? "What happened?"
+              : edit.kind === "cash"
+                ? "Where is the club’s cash?"
+                : edit.kind === "loans"
+                  ? "Who must the club repay?"
+                  : edit.kind === "transaction"
+                    ? edit.record
+                      ? "Transaction details"
+                      : labels[edit.type]
+                    : edit.kind === "member"
+                      ? edit.record
+                        ? "Edit member"
+                        : "Add a member"
+                      : edit.kind === "dues"
+                        ? "Assign dues"
+                        : edit.kind === "category"
+                          ? "Expense category"
+                          : edit.kind === "void"
+                            ? "Void transaction"
+                            : edit.member.name
           }
           onClose={() => !busy && setEdit(null)}
         >
-          {edit.kind === "transaction" ? (
+          {edit.kind === "start" ? (
+            <div className="entry-choices">
+              {[
+                {
+                  title: "Someone paid money",
+                  detail: "A member paid entry or weekly fees.",
+                  type: "contribution" as Kind,
+                },
+                {
+                  title: "The club bought something",
+                  detail: "An expense paid from club cash.",
+                  type: "expense" as Kind,
+                },
+                {
+                  title: "Someone provided items",
+                  detail: "Items or a purchase paid personally by a member.",
+                  type: "expense" as Kind,
+                  personal: true,
+                },
+                {
+                  title: "A member lent money",
+                  detail: "The club receives cash it must repay later.",
+                  type: "loan_received" as Kind,
+                },
+                {
+                  title: "The club repaid someone",
+                  detail: "Return part or all of a member’s loan.",
+                  type: "loan_repayment" as Kind,
+                },
+              ].map((choice) => (
+                <button
+                  className="entry-choice"
+                  key={choice.title}
+                  onClick={() =>
+                    setEdit({
+                      kind: "transaction",
+                      type: choice.type,
+                      personal: choice.personal,
+                    })
+                  }
+                >
+                  <span>
+                    <strong>{choice.title}</strong>
+                    <small>{choice.detail}</small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
+              ))}
+            </div>
+          ) : edit.kind === "cash" ? (
+            <div className="member-statement">
+              <p>
+                Cash includes fee payments and money lent to the club. Items
+                paid for personally never enter this balance.
+              </p>
+              <dl className="statement-lines">
+                <div>
+                  <dt>
+                    Cash received from members{" "}
+                    <small>Fee payments + loans</small>
+                  </dt>
+                  <dd>{money(cash.cashIn)}</dd>
+                </div>
+                <div>
+                  <dt>Cash spent / repaid</dt>
+                  <dd>−{money(cash.cashOut)}</dd>
+                </div>
+                <div className="statement-emphasis">
+                  <dt>Cash in hand now</dt>
+                  <dd>{money(totals.funds)}</dd>
+                </div>
+              </dl>
+              <button
+                className="button secondary"
+                onClick={() => {
+                  setEdit(null);
+                  go("Transactions");
+                }}
+              >
+                See all money movements
+              </button>
+            </div>
+          ) : edit.kind === "loans" ? (
+            <div className="member-statement">
+              <p>
+                This is money the club must return to members. It is separate
+                from their entry and weekly fees.
+              </p>
+              {data.members
+                .filter((m) => totals.members[m.id].loans > 0)
+                .map((m) => (
+                  <button
+                    className="entry-choice"
+                    key={m.id}
+                    onClick={() => setEdit({ kind: "details", member: m })}
+                  >
+                    <span>
+                      <strong>
+                        {m.name}
+                        {m.is_me ? " (You)" : ""}
+                      </strong>
+                      <small>Club owes this member</small>
+                    </span>
+                    <strong>{money(totals.members[m.id].loans)}</strong>
+                  </button>
+                ))}
+              {totals.loans === 0 && (
+                <p>No member loans remain to be repaid.</p>
+              )}
+            </div>
+          ) : edit.kind === "transaction" ? (
             <TransactionForm
               key={edit.record?.id || edit.type}
               {...{ data, busy }}
               type={edit.type}
               record={edit.record}
+              initialPersonal={edit.personal}
               onSave={(v) => save("transactions", v, edit.record?.id)}
               onVoid={() =>
                 edit.record && setEdit({ kind: "void", record: edit.record })
@@ -1443,7 +1627,12 @@ function App() {
               onSave={(v) => save("members", v, edit.record?.id)}
             />
           ) : edit.kind === "dues" ? (
-            <DuesForm members={active} busy={busy} onSave={assign} />
+            <DuesForm
+              members={active}
+              dues={data.dues}
+              busy={busy}
+              onSave={assign}
+            />
           ) : edit.kind === "category" ? (
             <CategoryForm
               record={edit.record}
@@ -1463,26 +1652,10 @@ function App() {
             />
           ) : (
             <>
-              <div className="detail-stats">
-                {Object.entries({
-                  "Assigned dues": totals.members[edit.member.id].assigned,
-                  "Cash contributions": totals.members[edit.member.id].cash,
-                  "Personal purchases":
-                    totals.members[edit.member.id].purchases,
-                  "Contribution credit": totals.members[edit.member.id].credit,
-                  "Outstanding dues":
-                    totals.members[edit.member.id].outstanding,
-                  "Excess credit": totals.members[edit.member.id].excess,
-                  "Loans given": totals.members[edit.member.id].borrowed,
-                  Repayments: totals.members[edit.member.id].repaid,
-                  "Loans owed": totals.members[edit.member.id].loans,
-                }).map(([k, v]) => (
-                  <div key={k}>
-                    <small>{k}</small>
-                    <strong>{money(v)}</strong>
-                  </div>
-                ))}
-              </div>
+              <MemberStatement data={data} member={edit.member} />
+              <h3 className="statement-history-title">
+                Payments, purchases and repayments
+              </h3>
               <TxList
                 rows={data.transactions.filter(
                   (t) =>
@@ -1525,10 +1698,16 @@ function Empty({ title, text }: { title: string; text: string }) {
     </div>
   );
 }
-function Chart({ data }: { data: ActivityPoint[] }) {
+function Chart({
+  data,
+  cash = false,
+}: {
+  data: ActivityPoint[];
+  cash?: boolean;
+}) {
   return (
     <Suspense fallback={<div className="chart loading">Loading chart…</div>}>
-      <LedgerChart data={data} />
+      <LedgerChart data={data} cash={cash} />
     </Suspense>
   );
 }
