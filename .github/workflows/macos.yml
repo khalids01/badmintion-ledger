@@ -1,0 +1,103 @@
+name: Build macOS installers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Public client configuration only; no service-role or account credentials.
+  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://wjrlgcvyefbewkkwnvlv.supabase.co' }}
+  VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_u_b8yPw2STaFIywb1t4GDg_lprxQfUY' }}
+  CARGO_TERM_COLOR: always
+  # Ad-hoc signing works without a paid Apple Developer certificate.
+  # These personal builds are not Apple-notarized.
+  APPLE_SIGNING_IDENTITY: '-'
+
+jobs:
+  macos:
+    name: macOS (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Apple Silicon
+            runner: macos-15
+            target: aarch64-apple-darwin
+            arch: arm64
+          - name: Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          workspaces: src-tauri -> target
+          key: macos-${{ matrix.target }}
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Build app and DMG installer
+        run: npm run tauri -- build --target '${{ matrix.target }}' --bundles dmg --ci
+      - name: Verify and package downloads
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          bundle="src-tauri/target/$TARGET/release/bundle"
+          app="$bundle/macos/Badminton Ledger.app"
+          test -d "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
+          lipo -verify_arch "$ARCH" "$app/Contents/MacOS/$executable"
+          mkdir -p artifacts
+          dmg_count=0
+          while IFS= read -r -d '' dmg; do
+            cp "$dmg" "artifacts/badminton-ledger-macos-$ARCH.dmg"
+            dmg_count=$((dmg_count + 1))
+          done < <(find "$bundle/dmg" -type f -name '*.dmg' -print0)
+          test "$dmg_count" -eq 1
+          ditto -c -k --sequesterRsrc --keepParent "$app" "artifacts/badminton-ledger-macos-$ARCH.app.zip"
+          (cd artifacts && shasum -a 256 *.dmg *.zip > SHA256SUMS.txt)
+      - name: Upload macOS downloads
+        id: upload
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: badminton-ledger-macos-${{ matrix.arch }}-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Add download instructions
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          ARCH_NAME: ${{ matrix.name }}
+        run: |
+          {
+            echo "## macOS ($ARCH_NAME) ready"
+            echo "[Download installer and app archive]($ARTIFACT_URL)"
+            echo ''
+            echo 'Unzip the artifact, open the DMG, and drag Badminton Ledger into Applications. An app ZIP and SHA256SUMS.txt are also included.'
+            echo ''
+            echo 'This personal build is ad-hoc signed, not Apple-notarized. macOS may require approval in System Settings > Privacy & Security before the first launch.'
+          } >> "$GITHUB_STEP_SUMMARY"

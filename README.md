@@ -61,3 +61,16 @@ Every push to `main`, pull request, and manual **Run workflow** starts **Build A
 Artifacts are kept for 30 days. GitHub requires signing in to download Actions artifacts. The APK is debug-signed and intended for personal testing, not Google Play distribution. Different fresh runners can generate different debug signing keys; uninstall an older test build if Android refuses an update. Uninstalling clears the local login session; your financial records remain in Supabase.
 
 The workflow supplies the connected project's public Supabase URL and publishable key. Optional repository **Variables** `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` override these defaults. No service-role key, account password, or private release signing key is needed. `.env` stays ignored.
+
+## Download the Mac app from GitHub
+
+[Actions → Build macOS installers](https://github.com/khalids01/badmintion-ledger/actions/workflows/macos.yml) builds on every push to `main`, pull request, or manual run. Choose the successful run and download the artifact for your Mac:
+
+- **arm64**: Apple Silicon (M-series Macs).
+- **x86_64**: Intel Macs.
+
+Each artifact includes a **DMG installer**, a **ZIP of the app**, and **SHA256SUMS.txt**. Unzip the artifact, open the DMG, and drag **Badminton Ledger** into Applications. Downloads expire after 30 days; rerun the workflow to generate new ones. GitHub sign-in is required for artifact downloads.
+
+The workflow verifies the app signature and CPU architecture before uploading. Builds are **ad-hoc signed, not Apple-notarized**; macOS may require first-launch approval under **System Settings → Privacy & Security**. Developer ID signing and notarization require your Apple Developer credentials, which are not configured here. See [Tauri’s macOS signing documentation](https://v2.tauri.app/distribute/sign/macos/).
+
+Like the APK build, macOS builds use the connected Supabase public configuration and support optional repository-variable overrides. Private credentials and `.env` stay out of Git.
