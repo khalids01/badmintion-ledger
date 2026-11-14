@@ -1,4 +1,8 @@
 begin;
+-- Fixture provisioning only. This replacement is never committed or visible to
+-- concurrent clients; rollback restores the real one-time setup trigger.
+create or replace function private.only_ledger_administrator() returns trigger
+language plpgsql security invoker set search_path='' as $$begin return new;end$$;
 insert into auth.users(id,email) values ('10000000-0000-4000-8000-000000000001','ledger-test-a@example.invalid'),('10000000-0000-4000-8000-000000000002','ledger-test-b@example.invalid');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
