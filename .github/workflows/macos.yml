@@ -53,12 +53,13 @@ jobs:
         with:
           workspaces: src-tauri -> target
           key: macos-${{ matrix.target }}
+          cache-on-failure: true
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
       - name: Build app and DMG installer
-        run: npm run tauri -- build --target '${{ matrix.target }}' --bundles dmg --ci
+        run: npm run tauri -- build --target '${{ matrix.target }}' --bundles app,dmg --ci
       - name: Verify and package downloads
         env:
           TARGET: ${{ matrix.target }}
