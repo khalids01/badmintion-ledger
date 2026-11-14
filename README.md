@@ -2,6 +2,18 @@
 
 A mobile-first React/TypeScript financial ledger with a Tauri 2 native shell and Supabase backend. Desktop uses a sidebar; phones use bottom navigation. Currency is BDT and dates use Asia/Dhaka.
 
+## Downloads
+
+| Platform | Download |
+| --- | --- |
+| Android · ARM64 | [Download APK archive](https://github.com/khalids01/badmintion-ledger/actions/runs/43594597679/artifacts/14113628731) |
+| Mac · Apple Silicon (M-series) | [Download DMG and app ZIP](https://github.com/khalids01/badmintion-ledger/actions/runs/43594597696/artifacts/14113258955) |
+| Mac · Intel | [Download DMG and app ZIP](https://github.com/khalids01/badmintion-ledger/actions/runs/43594597696/artifacts/14113229764) |
+
+Sign in to GitHub, download and unzip the artifact, then open the APK or DMG. These downloads include checksums and expire **December 14, 2026**. For newer builds, visit [Android builds](https://github.com/khalids01/badmintion-ledger/actions/workflows/android-apk.yml) or [Mac builds](https://github.com/khalids01/badmintion-ledger/actions/workflows/macos.yml).
+
+Android builds are debug-signed. Mac builds are ad-hoc signed and not Apple-notarized; first launch may require approval in **System Settings → Privacy & Security**.
+
 ## Run
 
 ```sh
