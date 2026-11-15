@@ -68,7 +68,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - name: Build app and DMG installer
+      - name: Build signed app and updater archive
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ github.event_name != 'pull_request' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TARGET: ${{ matrix.target }}
@@ -79,10 +79,17 @@ jobs:
             exit 1
           fi
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            npm run tauri -- build --target "$TARGET" --bundles app,dmg --ci --config '{"bundle":{"createUpdaterArtifacts":true}}'
+            npm run tauri -- build --target "$TARGET" --bundles app --ci --config '{"bundle":{"createUpdaterArtifacts":true}}'
           else
-            npm run tauri -- build --target "$TARGET" --bundles app,dmg --ci
+            npm run tauri -- build --target "$TARGET" --bundles app --ci
           fi
+      - name: Create and verify DMG installer
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          bundle="src-tauri/target/$TARGET/release/bundle"
+          bash scripts/package-macos-dmg.sh "$bundle/macos/Badminton Ledger.app" "$bundle/dmg/badminton-ledger-macos-$ARCH.dmg"
       - name: Verify and package downloads
         env:
           TARGET: ${{ matrix.target }}
