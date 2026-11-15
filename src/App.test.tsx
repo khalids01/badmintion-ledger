@@ -4,12 +4,15 @@ import { render, screen, cleanup, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Ledger } from "./lib/types";
+import { calculate } from "./lib/accounting";
 import { demo } from "./test/ledger-fixture";
 const store = vi.hoisted(() => ({
   data: null as Ledger | null,
   status: "active",
   admin: true,
   reads: 0,
+  insertError: false,
+  batches: [] as unknown[],
 }));
 vi.mock("./lib/supabase", () => ({
   supabase: {
@@ -42,6 +45,8 @@ vi.mock("./lib/supabase", () => ({
         insert: async (
           value: Record<string, unknown> | Record<string, unknown>[],
         ) => {
+          store.batches.push(value);
+          if (store.insertError) return { error: { message: "Save failed" } };
           const stamp = new Date().toISOString();
           const list = Array.isArray(value) ? value : [value];
           store.data = {
@@ -98,6 +103,8 @@ beforeEach(() => {
   store.status = "active";
   store.admin = true;
   store.reads = 0;
+  store.insertError = false;
+  store.batches = [];
 });
 describe("ledger workflows", () => {
   it("loads the saved ledger without a sample mode", async () => {
@@ -329,5 +336,47 @@ describe("member payment clarity and preferences", () => {
     expect(screen.getAllByText("Shawon Ahmed").length).toBeGreaterThan(0);
     await u.selectOptions(screen.getByLabelText("ভাষা"), "en");
     expect(screen.getByText("Active members")).toBeTruthy();
+  });
+});
+
+describe("linked payment persistence", () => {
+  async function fill() {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getByText("Someone paid money"));
+    await u.selectOptions(screen.getByLabelText("Member"), "m2");
+    await u.type(screen.getByLabelText("Amount (BDT)"), "500");
+    await u.click(screen.getByLabelText("Use this payment to repay a loan"));
+    return u;
+  }
+  it("sends one bulk insert and updates both members and club cash", async () => {
+    const u = await fill();
+    await u.click(screen.getByText("Save transaction"));
+    expect(store.batches).toHaveLength(1);
+    expect(store.batches[0]).toHaveLength(2);
+    const result = calculate(store.data!);
+    expect(result.funds).toBe(740000);
+    expect(result.members.m2.outstanding).toBe(0);
+    expect(result.members.m0.loans).toBe(150000);
+    await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
+    await u.click(screen.getByText("Loan repaid from Fahim Rahman's payment"));
+    await u.click(screen.getByText("View linked entry"));
+    expect((screen.getByLabelText("Member") as HTMLSelectElement).value).toBe(
+      "m2",
+    );
+    expect(
+      (screen.getByLabelText("Notes (optional)") as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+  it("keeps the form on failure and reuses IDs when retrying", async () => {
+    const u = await fill();
+    store.insertError = true;
+    await u.click(screen.getByText("Save transaction"));
+    expect(await screen.findByText("Save failed")).toBeTruthy();
+    expect(store.data!.transactions).toHaveLength(demo.transactions.length);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    store.insertError = false;
+    await u.click(screen.getByText("Save transaction"));
+    expect(store.batches[1]).toEqual(store.batches[0]);
   });
 });

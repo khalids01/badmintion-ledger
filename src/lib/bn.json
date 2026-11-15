@@ -383,5 +383,16 @@
   "BDT · non-voided transactions": "টাকা · বাতিল লেনদেন বাদে",
   "Cash and member-funded purchases counted toward fees · selected period": "নির্বাচিত সময়ের নগদ ও নিজের খরচ থেকে ফি জমা",
   "Cash received minus cash spent / repaid · member-funded purchases excluded": "আয় থেকে খরচ ও ফেরত বাদ · নিজের খরচ বাদে",
-  "Balances include all prior activity; date filters limit displayed transactions.": "হিসাবে আগের সব লেনদেন আছে; বাছাই করা তারিখের লেনদেন দেখানো হচ্ছে।"
+  "Balances include all prior activity; date filters limit displayed transactions.": "হিসাবে আগের সব লেনদেন আছে; বাছাই করা তারিখের লেনদেন দেখানো হচ্ছে।",
+  "Use this payment to repay a loan": "এই জমা থেকে ঋণ ফেরত দিন",
+  "Repay to": "যাকে ফেরত দেবেন",
+  "Choose a lender": "ঋণদাতা বাছুন",
+  "Repayment amount (BDT)": "ফেরতের পরিমাণ (৳)",
+  "Choose a lender with an outstanding loan": "যার ঋণ বাকি আছে তাকে বাছুন",
+  "Repayment cannot exceed this payment or the remaining loan": "ফেরতের পরিমাণ এই জমা বা বাকি ঋণের বেশি হতে পারবে না",
+  "Loan repaid from {name}'s payment": "{name}-এর জমা থেকে ঋণ ফেরত",
+  "Repay {name} {amount}; remaining loan {balance}.": "{name}-কে {amount} ফেরত; বাকি ঋণ {balance}।",
+  "Linked entry": "সংযুক্ত লেনদেন",
+  "View linked entry": "সংযুক্ত লেনদেন দেখুন",
+  "Editing or voiding changes only this entry.": "সম্পাদনা বা বাতিল করলে শুধু এই লেনদেন বদলাবে।"
 }

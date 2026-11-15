@@ -55,3 +55,16 @@ export function transactionDateLabel(t: Transaction) {
       })
     : day(t.transaction_date);
 }
+
+// Reciprocal record IDs keep the two cash movements traceable without a schema change.
+const linkPattern = /(?:^|\n)\[Linked transaction: ([0-9a-f-]{36})\]$/i;
+export function withoutLink(notes: string | null | undefined) {
+  return (notes || "").replace(linkPattern, "");
+}
+export function withLink(notes: string, id: string) {
+  return `${withoutLink(notes)}\n[Linked transaction: ${id}]`;
+}
+export function linkedEntry(data: Ledger, transaction: Transaction) {
+  const id = transaction.notes?.match(linkPattern)?.[1];
+  return id ? data.transactions.find((row) => row.id === id) : undefined;
+}

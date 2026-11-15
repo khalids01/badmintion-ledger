@@ -138,3 +138,79 @@ it("previews a new weekly period before assigning fees", async () => {
     ]),
   );
 });
+
+describe("payment used to repay a loan", () => {
+  async function setup(amount = "500") {
+    const save = vi.fn(),
+      u = userEvent.setup();
+    render(
+      <TransactionForm
+        data={demo}
+        type="contribution"
+        busy={false}
+        onSave={save}
+        onVoid={() => {}}
+      />,
+    );
+    await u.selectOptions(screen.getByLabelText("Member"), "m2");
+    await u.type(screen.getByLabelText("Amount (BDT)"), amount);
+    await u.click(screen.getByLabelText("Use this payment to repay a loan"));
+    return { save, u };
+  }
+  it("saves the full fee payment and a linked repayment to the lender", async () => {
+    const { save, u } = await setup();
+    expect(screen.getByRole("status").textContent).toContain(
+      "Cash in hand will be ৳7,400",
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "remaining loan ৳1,500",
+    );
+    await u.click(screen.getByText("Save transaction"));
+    const [payment, repayment] = save.mock.calls[0][0];
+    expect(payment).toMatchObject({
+      type: "contribution",
+      amount: "500",
+      member_id: "m2",
+    });
+    expect(repayment).toMatchObject({
+      type: "loan_repayment",
+      amount: "500",
+      member_id: "m0",
+    });
+    expect(payment.notes).toContain(repayment.id);
+    expect(repayment.notes).toContain(payment.id);
+  });
+  it("allows a partial repayment and leaves the rest in club cash", async () => {
+    const { save, u } = await setup();
+    await u.clear(screen.getByLabelText("Repayment amount (BDT)"));
+    await u.type(screen.getByLabelText("Repayment amount (BDT)"), "200");
+    expect(screen.getByRole("status").textContent).toContain(
+      "Cash in hand will be ৳7,700",
+    );
+    await u.click(screen.getByText("Save transaction"));
+    expect(save.mock.calls[0][0][1].amount).toBe("200");
+  });
+  for (const [amount, repayment] of [
+    ["500", "501"],
+    ["2500", "2100"],
+    ["500", "0"],
+    ["500", "oops"],
+  ]) {
+    it(`rejects invalid repayment ${repayment} on payment ${amount}`, async () => {
+      const { save, u } = await setup(amount);
+      await u.clear(screen.getByLabelText("Repayment amount (BDT)"));
+      await u.type(screen.getByLabelText("Repayment amount (BDT)"), repayment);
+      await u.click(screen.getByText("Save transaction"));
+      expect(save).not.toHaveBeenCalled();
+    });
+  }
+  it("keeps normal payment saving when repayment is switched off", async () => {
+    const { save, u } = await setup();
+    await u.click(screen.getByLabelText("Use this payment to repay a loan"));
+    await u.click(screen.getByText("Save transaction"));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "contribution", amount: "500" }),
+    );
+    expect(Array.isArray(save.mock.calls[0][0])).toBe(false);
+  });
+});

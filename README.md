@@ -24,6 +24,8 @@ The dashboard separates cash in hand, unpaid member fees, money the club must re
 
 Choose **English** or **বাংলা** from the language selector; your preference is saved. Link your own member profile in **Settings → My member profile**.
 
+When recording a fee payment, enable **Use this payment to repay a loan**, choose the lender, and enter the repayment amount. The payer receives full fee credit; both cash movements save together. Open either transaction to view its linked entry.
+
 The app checks for updates on startup. Check manually in **Settings → Application updates**. Appearance settings offer **Light**, **Dark**, and **System** modes.
 
 ## Development

@@ -13,7 +13,12 @@ import type {
   Category,
   Due,
 } from "../lib/types";
-import { isOriginalDateUnknown } from "../lib/presentation";
+import {
+  isOriginalDateUnknown,
+  linkedEntry,
+  withoutLink,
+  withLink,
+} from "../lib/presentation";
 import { labels } from "../lib/labels";
 const txSchema = z
   .object({
@@ -43,6 +48,9 @@ const txSchema = z
     payment_method: z.string(),
     description: z.string().max(250),
     notes: z.string().max(2000),
+    use_repayment: z.boolean(),
+    repay_member: z.string(),
+    repay_amount: z.string(),
   })
   .superRefine((v, ctx) => {
     if (v.type !== "expense" && !v.date)
@@ -76,20 +84,23 @@ export function TransactionForm({
   busy,
   onSave,
   onVoid,
+  onLinked,
 }: {
   data: Ledger;
   type: Kind;
   record?: Transaction;
   initialPersonal?: boolean;
   busy: boolean;
-  onSave: (v: Record<string, unknown>) => void;
+  onSave: (v: Record<string, unknown> | Record<string, unknown>[]) => void;
   onVoid: () => void;
+  onLinked?: (record: Transaction) => void;
 }) {
   const {
     register,
     handleSubmit,
     watch,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<TxValues>({
     resolver: zodResolver(txSchema),
@@ -115,15 +126,29 @@ export function TransactionForm({
       personal_settlement: record?.personal_settlement || "contribution",
       payment_method: record?.payment_method || "cash",
       description: record?.description || "",
-      notes: record?.notes || "",
+      notes: withoutLink(record?.notes),
+      use_repayment: false,
+      repay_member:
+        data.members.find(
+          (m) => m.is_me && calculate(data).members[m.id].loans > 0,
+        )?.id || "",
+      repay_amount: "",
     },
   });
+  const [linkedIds] = useState(() => [
+    crypto.randomUUID(),
+    crypto.randomUUID(),
+  ]);
+  const linked = record ? linkedEntry(data, record) : undefined;
   const kind = watch("type"),
     personal =
       kind === "expense" && watch("funding_source") === "member_personal",
     member = watch("member_id"),
     settlement = watch("personal_settlement"),
-    amountText = watch("amount");
+    amountText = watch("amount"),
+    useRepayment = !record && kind === "contribution" && watch("use_repayment"),
+    repayMember = watch("repay_member"),
+    repayAmountText = watch("repay_amount");
   const adjusted = {
       ...data,
       transactions: data.transactions.filter((t) => t.id !== record?.id),
@@ -141,8 +166,17 @@ export function TransactionForm({
   const unpaid = summary.members[member]?.outstanding || 0;
   const addsFeeCredit =
     kind === "contribution" || (personal && settlement === "contribution");
+  let repayAmount = 0;
+  try {
+    repayAmount = minor(repayAmountText);
+  } catch {
+    /* Field validation handles invalid input. */
+  }
+  const lenderBalance = summary.members[repayMember]?.loans || 0;
+  const lenderName = data.members.find((m) => m.id === repayMember)?.name || "";
   const nextCash =
-    summary.funds +
+    summary.funds -
+    (useRepayment ? repayAmount : 0) +
     (kind === "contribution" || kind === "loan_received"
       ? previewAmount
       : kind === "loan_repayment" || (kind === "expense" && !personal)
@@ -160,7 +194,28 @@ export function TransactionForm({
           });
           return;
         }
-        onSave({
+        if (useRepayment) {
+          if (!repayMember || lenderBalance <= 0) {
+            setError("repay_member", {
+              message: "Choose a lender with an outstanding loan",
+            });
+            return;
+          }
+          if (repayAmount <= 0) {
+            setError("repay_amount", {
+              message: "Enter a valid amount greater than zero",
+            });
+            return;
+          }
+          if (repayAmount > minor(v.amount) || repayAmount > lenderBalance) {
+            setError("repay_amount", {
+              message:
+                "Repayment cannot exceed this payment or the remaining loan",
+            });
+            return;
+          }
+        }
+        const payment: Record<string, unknown> = {
           type: v.type,
           amount: v.amount,
           transaction_date: (v.date || today()) + "T12:00:00+06:00",
@@ -171,13 +226,52 @@ export function TransactionForm({
           personal_settlement: personal ? v.personal_settlement : null,
           payment_method: personal ? null : v.payment_method,
           description: v.description || null,
-          notes: v.notes || null,
-        });
+          notes:
+            record && linked ? withLink(v.notes, linked.id) : v.notes || null,
+        };
+        if (useRepayment) {
+          payment.id = linkedIds[0];
+          payment.notes = withLink(v.notes, linkedIds[1]);
+          onSave([
+            payment,
+            {
+              ...payment,
+              id: linkedIds[1],
+              type: "loan_repayment",
+              amount: v.repay_amount,
+              member_id: v.repay_member,
+              description: t("Loan repaid from {name}'s payment", {
+                name: person,
+              }),
+              notes: withLink("", linkedIds[0]),
+            },
+          ]);
+        } else onSave(payment);
       })}
     >
       {record?.voided_at && (
         <div className="error-banner">
           {t("Voided:")} {record.void_reason}
+        </div>
+      )}
+      {linked && (
+        <div className="info-box linked-payment">
+          <span>
+            {t("Linked entry")}:{" "}
+            {data.members.find((m) => m.id === linked.member_id)?.name} ·{" "}
+            {money(minor(linked.amount))}
+            {linked.voided_at ? ` · ${t("Voided")}` : ""}
+          </span>
+          {onLinked && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => onLinked(linked)}
+            >
+              {t("View linked entry")}
+            </button>
+          )}
+          <small>{t("Editing or voiding changes only this entry.")}</small>
         </div>
       )}
       <details className="form-guide">
@@ -308,6 +402,49 @@ export function TransactionForm({
           </select>
         </label>
       )}
+      {!record && kind === "contribution" && summary.loans > 0 && (
+        <div className="repayment-choice">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              {...register("use_repayment")}
+              onChange={(e) => {
+                setValue("use_repayment", e.target.checked);
+                if (e.target.checked && !repayAmountText)
+                  setValue("repay_amount", amountText);
+              }}
+            />
+            {t("Use this payment to repay a loan")}
+          </label>
+          {useRepayment && (
+            <>
+              <label>
+                {t("Repay to")}
+                <select {...register("repay_member")}>
+                  <option value="">{t("Choose a lender")}</option>
+                  {data.members
+                    .filter((m) => summary.members[m.id].loans > 0)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} · {money(summary.members[m.id].loans)}
+                      </option>
+                    ))}
+                </select>
+                {errors.repay_member && (
+                  <em>{t(errors.repay_member.message)}</em>
+                )}
+              </label>
+              <label>
+                {t("Repayment amount (BDT)")}
+                <input inputMode="decimal" {...register("repay_amount")} />
+                {errors.repay_amount && (
+                  <em>{t(errors.repay_amount.message)}</em>
+                )}
+              </label>
+            </>
+          )}
+        </div>
+      )}
       <label>
         {t("Description")}
         <input
@@ -357,6 +494,15 @@ export function TransactionForm({
                 })}
               </p>
             )}
+          {useRepayment && repayMember && (
+            <p>
+              {t("Repay {name} {amount}; remaining loan {balance}.", {
+                name: lenderName,
+                amount: money(repayAmount),
+                balance: money(Math.max(0, lenderBalance - repayAmount)),
+              })}
+            </p>
+          )}
           {kind === "loan_repayment" && member && (
             <p>
               {t("The club will still owe {name} {amount}.", {

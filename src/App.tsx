@@ -224,7 +224,7 @@ function App() {
     );
   async function save(
     table: keyof Ledger,
-    values: Record<string, unknown>,
+    values: Record<string, unknown> | Record<string, unknown>[],
     id?: string,
   ) {
     if (busy) return;
@@ -234,10 +234,24 @@ function App() {
         throw new Error(
           "You are offline. Reconnect and try again. Your form is preserved.",
         );
-      const payload = { ...values, owner_id: session!.user.id };
-      const result = id
-        ? await supabase!.from(table).update(payload).eq("id", id)
-        : await insertRecord(table, payload);
+      const result = Array.isArray(values)
+        ? await supabase!
+            .from("transactions")
+            .insert(
+              values.map((row) => ({
+                ...row,
+                owner_id: session!.user.id,
+              })) as TablesInsert<"transactions">[],
+            )
+        : id
+          ? await supabase!
+              .from(table)
+              .update({ ...values, owner_id: session!.user.id })
+              .eq("id", id)
+          : await insertRecord(table, {
+              ...values,
+              owner_id: session!.user.id,
+            });
       if (result.error) throw result.error;
       await client.invalidateQueries({ queryKey: ["ledger"] });
       setEdit(null);
@@ -1649,6 +1663,9 @@ function App() {
               record={edit.record}
               initialPersonal={edit.personal}
               onSave={(v) => save("transactions", v, edit.record?.id)}
+              onLinked={(record) =>
+                setEdit({ kind: "transaction", type: record.type, record })
+              }
               onVoid={() =>
                 edit.record && setEdit({ kind: "void", record: edit.record })
               }

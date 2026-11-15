@@ -2901,3 +2901,16 @@ em {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.repayment-choice {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  border-radius: 10px;
+  background: var(--bg-f7f8fa, #f7f8fa);
+}
+.linked-payment {
+  display: grid;
+  gap: 8px;
+}
