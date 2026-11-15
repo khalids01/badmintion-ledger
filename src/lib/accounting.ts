@@ -1,3 +1,4 @@
+import { getLanguage } from "./i18n";
 import type { Ledger } from "./types";
 export function minor(value: number | string): number {
   const text = String(value);
@@ -104,7 +105,7 @@ export const today = () =>
     day: "2-digit",
   }).format(new Date());
 export const day = (v: string) =>
-  new Intl.DateTimeFormat("en-GB", {
+  new Intl.DateTimeFormat(getLanguage() === "bn" ? "bn-BD" : "en-GB", {
     timeZone: "Asia/Dhaka",
     day: "numeric",
     month: "short",

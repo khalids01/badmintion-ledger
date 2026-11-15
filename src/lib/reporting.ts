@@ -1,3 +1,4 @@
+import { getLanguage } from "./i18n";
 import { calculate, day, today } from "./accounting";
 import { cashMovement } from "./presentation";
 import type { Ledger } from "./types";
@@ -44,11 +45,14 @@ export function weeklyActivity(
     return {
       CashIn: cash.cashIn / 100,
       CashOut: cash.cashOut / 100,
-      label: new Intl.DateTimeFormat("en-GB", {
-        timeZone: "UTC",
-        day: "numeric",
-        month: "short",
-      }).format(start),
+      label: new Intl.DateTimeFormat(
+        getLanguage() === "bn" ? "bn-BD" : "en-GB",
+        {
+          timeZone: "UTC",
+          day: "numeric",
+          month: "short",
+        },
+      ).format(start),
       range:
         day(from + "T12:00:00+06:00") + " – " + day(to + "T12:00:00+06:00"),
       Contributions: totals.collected / 100,

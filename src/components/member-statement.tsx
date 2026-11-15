@@ -1,93 +1,159 @@
 import { calculate, money, minor } from "../lib/accounting";
-import { memberCashPaid } from "../lib/presentation";
-import type { Ledger, Member } from "../lib/types";
+import {
+  memberCashPaid,
+  transactionLabel,
+  transactionDateLabel,
+} from "../lib/presentation";
+import { t } from "../features/language";
+import type { Ledger, Member, Transaction } from "../lib/types";
 export function MemberStatement({
   data,
   member,
+  onTransaction,
 }: {
   data: Ledger;
   member: Member;
+  onTransaction?: (transaction: Transaction) => void;
 }) {
   const balance = calculate(data).members[member.id];
+  const cash = memberCashPaid(data, member.id);
   const fees = data.dues.filter(
     (d) => d.member_id === member.id && !d.voided_at,
   );
+  const transactions = data.transactions
+    .filter(
+      (tx) =>
+        !tx.voided_at &&
+        (tx.member_id === member.id || tx.paid_by_member_id === member.id),
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(b.transaction_date) - Date.parse(a.transaction_date) ||
+        Date.parse(b.created_at) - Date.parse(a.created_at),
+    );
+  const payments = transactions.filter(
+    (tx) =>
+      tx.type === "contribution" ||
+      tx.type === "loan_received" ||
+      (tx.type === "expense" &&
+        tx.funding_source === "member_personal" &&
+        tx.paid_by_member_id === member.id),
+  );
   return (
     <div className="member-statement">
-      <div
-        className={`statement-status ${balance.outstanding ? "unpaid" : "paid"}`}
-      >
-        <strong>
-          {balance.outstanding
-            ? `${money(balance.outstanding)} still due from ${member.name}`
-            : balance.assigned === 0
-              ? "No fees assigned yet"
-              : "Entry and weekly fees fully paid"}
-        </strong>
-        <p>
-          {balance.loans > 0
-            ? `The club also owes ${member.name} ${money(balance.loans)}. This is separate from fees.`
-            : "The club has no loan to repay to this member."}
-        </p>
+      <div className="statement-total">
+        <span>{t("Total paid")}</span>
+        <strong>{money(cash + balance.purchases)}</strong>
+        <small>{t("Cash given + spent personally")}</small>
+        {payments.length > 0 && (
+          <div
+            className="payment-equation"
+            aria-label={t("Individual payments")}
+          >
+            {payments.map((tx, i) => (
+              <span key={tx.id}>
+                {i > 0 && <b> + </b>}
+                {money(minor(tx.amount))}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="statement-split">
+        <div>
+          <span>{t("Cash given")}</span>
+          <strong>{money(cash)}</strong>
+        </div>
+        <div>
+          <span>{t("Spent personally")}</span>
+          <strong>{money(balance.purchases)}</strong>
+        </div>
       </div>
       <dl className="statement-lines">
         <div>
-          <dt>Expected payment</dt>
-          <dd>{money(balance.assigned)}</dd>
-        </div>
-        <div>
-          <dt>
-            Cash paid to club{" "}
-            <small>Includes fee payments and money lent</small>
-          </dt>
-          <dd>{money(memberCashPaid(data, member.id))}</dd>
-        </div>
-        <div>
-          <dt>
-            Items / purchases provided{" "}
-            <small>Paid personally; no cash added to club</small>
-          </dt>
-          <dd>{money(balance.purchases)}</dd>
-        </div>
-        <div>
-          <dt>Counted toward fees</dt>
-          <dd>{money(balance.credit)}</dd>
-        </div>
-        <div>
-          <dt>Still due from member</dt>
+          <dt>{t("Still due from member")}</dt>
           <dd>{money(balance.outstanding)}</dd>
         </div>
         <div className="statement-emphasis">
-          <dt>
-            Club owes member <small>Remaining loan to repay</small>
-          </dt>
+          <dt>{t("Club owes member")}</dt>
           <dd>{money(balance.loans)}</dd>
         </div>
         {balance.repaid > 0 && (
           <div>
-            <dt>Already repaid by club</dt>
+            <dt>{t("Already repaid by club")}</dt>
             <dd>{money(balance.repaid)}</dd>
           </div>
         )}
-        {balance.excess > 0 && (
-          <div>
-            <dt>
-              Extra fee credit{" "}
-              <small>This is recorded as credit, separate from loans</small>
-            </dt>
-            <dd>{money(balance.excess)}</dd>
-          </div>
-        )}
       </dl>
-      <h3>What makes up the expected payment?</h3>
-      <div className="fee-breakdown">
-        {fees.map((d) => (
-          <div key={d.id}>
-            <span>{d.title}</span>
-            <strong>{money(minor(d.amount))}</strong>
+      <details className="fee-details">
+        <summary>{t("Fee breakdown")}</summary>
+        <dl className="statement-lines">
+          <div>
+            <dt>{t("Expected payment")}</dt>
+            <dd>{money(balance.assigned)}</dd>
           </div>
-        ))}
-        {!fees.length && <p>No fees have been assigned yet.</p>}
+          <div>
+            <dt>{t("Counted toward fees")}</dt>
+            <dd>{money(balance.credit)}</dd>
+          </div>
+          {balance.excess > 0 && (
+            <div>
+              <dt>{t("Extra fee credit")}</dt>
+              <dd>{money(balance.excess)}</dd>
+            </div>
+          )}
+        </dl>
+        <div className="fee-breakdown">
+          {fees.map((d) => (
+            <div key={d.id}>
+              <span>{d.title}</span>
+              <strong>{money(minor(d.amount))}</strong>
+            </div>
+          ))}
+        </div>
+      </details>
+      <h3 className="statement-history-title">{t("Payment history")}</h3>
+      <div className="payment-history">
+        {transactions.map((tx) => {
+          const content = (
+            <>
+              <span>
+                <strong>{tx.description || t(transactionLabel(tx))}</strong>
+                <small>
+                  {t(transactionLabel(tx))} · {transactionDateLabel(tx)}
+                </small>
+                {tx.type === "expense" &&
+                  tx.funding_source === "member_personal" && (
+                    <small>
+                      {t(
+                        tx.personal_settlement === "contribution"
+                          ? "Counts toward fees"
+                          : "Club will repay",
+                      )}
+                    </small>
+                  )}
+              </span>
+              <strong>
+                {tx.type === "loan_repayment" ? "−" : ""}
+                {money(minor(tx.amount))}
+              </strong>
+            </>
+          );
+          return onTransaction ? (
+            <button
+              className="payment-row"
+              key={tx.id}
+              onClick={() => onTransaction(tx)}
+            >
+              {content}
+            </button>
+          ) : (
+            <div className="payment-row" key={tx.id}>
+              {content}
+            </div>
+          );
+        })}
+        {!transactions.length && <p>{t("No payments yet")}</p>}
       </div>
     </div>
   );

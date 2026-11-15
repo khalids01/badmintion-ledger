@@ -78,6 +78,7 @@ vi.mock("./components/ledger-chart", () => ({
   default: () => <div>Monthly chart</div>,
 }));
 import App from "./App";
+import { setLanguage } from "./lib/i18n";
 async function mount() {
   const result = render(
     <QueryClientProvider client={new QueryClient()}>
@@ -87,7 +88,10 @@ async function mount() {
   await screen.findByText("Cash in hand");
   return result;
 }
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   store.data = structuredClone(demo);
@@ -271,5 +275,59 @@ describe("balance explanations", () => {
     expect(
       screen.getByLabelText("Should this count as their payment or a loan?"),
     ).toBeTruthy();
+  });
+});
+
+describe("member payment clarity and preferences", () => {
+  it("opens any member directly from the dashboard and shows cash plus personal spending", async () => {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(
+      screen.getByRole("button", { name: /Shawon Ahmed.*Total paid/ }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByText("Total paid").closest("div")?.textContent,
+    ).toContain("৳4,600");
+    expect(
+      within(dialog).getByText("Cash given").closest("div")?.textContent,
+    ).toContain("৳4,000");
+  });
+  it("moves profile selection into settings without changing administrator access", async () => {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getAllByText("Members", { exact: true })[0]);
+    await u.click(screen.getByText("Add member"));
+    expect(screen.queryByLabelText(/This is me/)).toBeNull();
+    await u.click(screen.getByLabelText("Close"));
+    await u.click(screen.getAllByText("Settings", { exact: true })[0]);
+    await u.selectOptions(screen.getByLabelText("My member profile"), "m1");
+    expect(store.data!.members.find((m) => m.id === "m0")!.is_me).toBe(false);
+    expect(store.data!.members.find((m) => m.id === "m1")!.is_me).toBe(true);
+    expect(store.admin).toBe(true);
+    await u.selectOptions(screen.getByLabelText("My member profile"), "");
+    expect(store.data!.members.some((m) => m.is_me)).toBe(false);
+  });
+  it("switches to Bangla, preserves an open form and saves the language preference", async () => {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getByText("Someone paid money"));
+    await u.type(screen.getByLabelText("Amount (BDT)"), "390");
+    await u.selectOptions(
+      within(screen.getByRole("dialog")).getByLabelText("Language"),
+      "bn",
+    );
+    expect(screen.getByRole("heading", { name: "ফি জমা" })).toBeTruthy();
+    expect(
+      (screen.getByLabelText("টাকার পরিমাণ (৳)") as HTMLInputElement).value,
+    ).toBe("390");
+    expect(document.documentElement.lang).toBe("bn");
+    expect(localStorage.getItem("ledger-language")).toBe("bn");
+    await u.click(screen.getByLabelText("বন্ধ করুন"));
+    await u.click(screen.getAllByText("সদস্য", { exact: true })[0]);
+    expect(screen.getByText("সক্রিয় সদস্য")).toBeTruthy();
+    expect(screen.getAllByText("Shawon Ahmed").length).toBeGreaterThan(0);
+    await u.selectOptions(screen.getByLabelText("ভাষা"), "en");
+    expect(screen.getByText("Active members")).toBeTruthy();
   });
 });

@@ -1,3 +1,5 @@
+import { useLanguage } from "./language";
+import { t } from "../lib/i18n";
 import {
   createContext,
   useContext,
@@ -245,40 +247,45 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   );
 }
 export function UpdateControl() {
+  useLanguage();
   const state = useContext(UpdatesContext);
   if (!state) return null;
   const busy = state.status === "checking" || state.status === "installing";
   return (
-    <section className="update-control" aria-label="Application updates">
+    <section className="update-control" aria-label={t("Application updates")}>
       <div className="update-heading">
         <div>
-          <strong>Application updates</strong>
-          <small>Version {state.currentVersion}</small>
+          <strong>{t("Application updates")}</strong>
+          <small>
+            {t("Version")} {state.currentVersion}
+          </small>
         </div>
         <ArrowUpCircle size={20} />
       </div>
       <p role="status">
         {state.status === "checking"
-          ? "Checking for updates…"
+          ? t("Checking for updates…")
           : state.status === "current"
-            ? "You’re up to date."
+            ? t("You’re up to date.")
             : state.status === "available"
-              ? "Version " + state.version + " is available."
+              ? t("Version {version} is available.", { version: state.version })
               : state.status === "installing"
-                ? "Downloading update" +
+                ? t("Downloading update") +
                   (state.progress !== null ? " · " + state.progress + "%" : "…")
                 : state.status === "restart"
-                  ? "Update installed. Restart to finish."
+                  ? t("Update installed. Restart to finish.")
                   : state.status === "browser"
-                    ? "Updates are installed through the desktop or Android app."
+                    ? t(
+                        "Updates are installed through the desktop or Android app.",
+                      )
                     : state.status === "error"
-                      ? "Could not complete the update."
-                      : "Checks automatically when you open the app."}
+                      ? t("Could not complete the update.")
+                      : t("Checks automatically when you open the app.")}
       </p>
       {state.notes &&
         ["available", "installing", "restart"].includes(state.status) && (
           <details className="release-notes">
-            <summary>What’s new</summary>
+            <summary>{t("What’s new")}</summary>
             <p>{state.notes}</p>
           </details>
         )}
@@ -295,10 +302,10 @@ export function UpdateControl() {
           >
             <Download size={15} />
             {state.status === "restart"
-              ? "Restart now"
+              ? t("Restart now")
               : state.mobile
-                ? "Download APK"
-                : "Install & restart"}
+                ? t("Download APK")
+                : t("Install & restart")}
           </button>
         )}
         <button
@@ -308,18 +315,19 @@ export function UpdateControl() {
           onClick={() => void state.checkUpdates()}
         >
           <RefreshCw size={15} className={busy ? "spin" : ""} />
-          {busy ? "Please wait…" : "Check for updates"}
+          {busy ? t("Please wait…") : t("Check for updates")}
         </button>
       </div>
       {state.mobile && state.status === "available" && (
         <small>
-          Android will ask you to confirm installation after downloading.
+          {t("Android will ask you to confirm installation after downloading.")}
         </small>
       )}
     </section>
   );
 }
 function UpdateBanner() {
+  useLanguage();
   const state = useContext(UpdatesContext);
   if (
     !state ||
@@ -339,16 +347,16 @@ function UpdateBanner() {
       <div>
         <strong>
           {state.status === "restart"
-            ? "Your update is ready"
+            ? t("Your update is ready")
             : state.status === "installing"
-              ? "Updating your ledger…"
-              : "A new version is available"}
+              ? t("Updating your ledger…")
+              : t("A new version is available")}
         </strong>
         <p>
           {state.status === "installing"
             ? state.progress !== null
-              ? state.progress + "% downloaded"
-              : "Downloading securely…"
+              ? t("{count}% downloaded", { count: state.progress })
+              : t("Downloading securely…")
             : "Badminton Ledger " + state.version}
         </p>
       </div>
@@ -359,17 +367,17 @@ function UpdateBanner() {
         onClick={() => void state.install()}
       >
         {state.status === "restart"
-          ? "Restart"
+          ? t("Restart")
           : state.mobile
-            ? "Download"
-            : "Update"}
+            ? t("Download")
+            : t("Update")}
         <Download size={15} />
       </button>
       {state.status === "available" && (
         <button
           type="button"
           className="icon-button"
-          aria-label="Remind me later"
+          aria-label={t("Remind me later")}
           onClick={state.dismiss}
         >
           <X size={17} />

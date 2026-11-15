@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import {
   createContext,
   useContext,
@@ -61,7 +62,7 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
       <button
         type="button"
         className="icon-button theme-toggle"
-        aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+        aria-label={dark ? t("Switch to light mode") : t("Switch to dark mode")}
         onClick={() =>
           setTheme(
             document.documentElement.dataset.theme === "dark"
@@ -75,7 +76,7 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
     );
   return (
     <div className="preference-control">
-      <span>Appearance</span>
+      <span>{t("Appearance")}</span>
       <div className="theme-options">
         {(
           [
@@ -91,7 +92,7 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
             onClick={() => setTheme(value)}
           >
             <Icon size={16} />
-            {value}
+            {t(value)}
           </button>
         ))}
       </div>

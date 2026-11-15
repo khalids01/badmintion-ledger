@@ -1,3 +1,5 @@
+import { LanguageControl } from "./language";
+import { t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { Wallet, ArrowRight, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -42,25 +44,26 @@ export function Auth({
       <div className="auth-brand">
         <img className="brand-icon" src="/brand.svg" alt="" />
         Badminton Ledger
+        <LanguageControl compact />
         <ThemeControl compact />
       </div>
       <section className="auth-card">
         <span className="auth-symbol">
           <Wallet size={28} />
         </span>
-        <div className="eyebrow">LESS BOOKKEEPING. MORE BADMINTON.</div>
+        <div className="eyebrow">{t("LESS BOOKKEEPING. MORE BADMINTON.")}</div>
         <h1>
           {resetMode
-            ? "Choose a new password."
+            ? t("Choose a new password.")
             : signup
-              ? "Join your club."
+              ? t("Join your club.")
               : setup
-                ? "Set up your ledger."
+                ? t("Set up your ledger.")
                 : recovery
-                  ? "Reset your password."
-                  : "Welcome back."}
+                  ? t("Reset your password.")
+                  : t("Welcome back.")}
         </h1>
-        <p>Your club’s finances, in one clear view.</p>
+        <p>{t("Your club’s finances, in one clear view.")}</p>
         <form
           className="form"
           onSubmit={async (e) => {
@@ -112,7 +115,7 @@ export function Auth({
               setMessage(
                 e instanceof Error
                   ? e.message
-                  : "Could not complete the request. Try again.",
+                  : t("Could not complete the request. Try again."),
               );
               if (setup) void loadSetup();
             } finally {
@@ -122,7 +125,7 @@ export function Auth({
         >
           {!resetMode && (
             <label>
-              Email address
+              {t("Email address")}
               <input
                 type="email"
                 name="email"
@@ -136,7 +139,7 @@ export function Auth({
           )}
           {(!recovery || resetMode) && (
             <label htmlFor="auth-password">
-              {resetMode || setup || signup ? "New password" : "Password"}
+              {resetMode || setup || signup ? t("New password") : t("Password")}
               <div className="password-field">
                 <input
                   id="auth-password"
@@ -153,7 +156,7 @@ export function Auth({
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={visible ? "Hide password" : "Show password"}
+                  aria-label={visible ? t("Hide password") : t("Show password")}
                   aria-pressed={visible}
                   onClick={() => setVisible((v) => !v)}
                 >
@@ -164,21 +167,21 @@ export function Auth({
           )}
           {message && (
             <div className="info-box" role="status">
-              {message}
+              {t(message)}
             </div>
           )}
           <button className="button primary" disabled={busy}>
             {busy
-              ? "Please wait…"
+              ? t("Please wait…")
               : resetMode
-                ? "Save new password"
+                ? t("Save new password")
                 : signup
-                  ? "Create account"
+                  ? t("Create account")
                   : setup
-                    ? "Create administrator account"
+                    ? t("Create administrator account")
                     : recovery
-                      ? "Send recovery email"
-                      : "Sign in"}
+                      ? t("Send recovery email")
+                      : t("Sign in")}
             <ArrowRight size={16} />
           </button>
         </form>
@@ -194,7 +197,7 @@ export function Auth({
                 setVisible(false);
               }}
             >
-              {recovery ? "Back to sign in" : "Forgot password?"}
+              {recovery ? t("Back to sign in") : t("Forgot password?")}
             </button>
             {signupEnabled && setupComplete === true && (
               <button
@@ -208,7 +211,7 @@ export function Auth({
                   setMessage("");
                 }}
               >
-                {signup ? "Back to sign in" : "Create an account"}
+                {signup ? t("Back to sign in") : t("Create an account")}
               </button>
             )}
             {setupComplete === false && (
@@ -222,13 +225,13 @@ export function Auth({
                 }}
               >
                 {setup
-                  ? "Already set up? Sign in"
-                  : "First time? Set up administrator account"}
+                  ? t("Already set up? Sign in")
+                  : t("First time? Set up administrator account")}
               </button>
             )}
             {setupError && (
               <button className="text-button" onClick={() => void loadSetup()}>
-                Retry setup status
+                {t("Retry setup status")}
               </button>
             )}
           </>
@@ -237,12 +240,12 @@ export function Auth({
           <UpdateControl />
         </div>
         <p className="form-hint">
-          New accounts need administrator approval to access the club.
+          {t("New accounts need administrator approval to access the club.")}
         </p>
       </section>
       <span className="auth-footer">
         <ShieldCheck size={15} />
-        Your club. Your records.
+        {t("Your club. Your records.")}
       </span>
     </div>
   );

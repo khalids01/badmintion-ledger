@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -12,7 +13,7 @@ import type {
   Category,
   Due,
 } from "../lib/types";
-import { transactionDateLabel } from "../lib/presentation";
+import { isOriginalDateUnknown } from "../lib/presentation";
 import { labels } from "../lib/labels";
 const txSchema = z
   .object({
@@ -175,51 +176,62 @@ export function TransactionForm({
       })}
     >
       {record?.voided_at && (
-        <div className="error-banner">Voided: {record.void_reason}</div>
+        <div className="error-banner">
+          {t("Voided:")} {record.void_reason}
+        </div>
       )}
-      <p className="form-intro">
-        {kind === "contribution"
-          ? "Record money paid toward a member’s entry or weekly fees."
-          : kind === "loan_received"
-            ? "Record cash a member lent to the club. This does not pay their fees."
-            : kind === "loan_repayment"
-              ? "Record money the club returned to a member who lent it."
-              : "Record what was bought, who paid, and how it should count."}
-      </p>
+      <details className="form-guide">
+        <summary>{t("How this works")}</summary>
+        <p>
+          {kind === "contribution"
+            ? t("Record money paid toward a member’s entry or weekly fees.")
+            : kind === "loan_received"
+              ? t(
+                  "Record cash a member lent to the club. This does not pay their fees.",
+                )
+              : kind === "loan_repayment"
+                ? t("Record money the club returned to a member who lent it.")
+                : t(
+                    "Record what was bought, who paid, and how it should count.",
+                  )}
+        </p>
+      </details>
       <label>
-        Transaction type
+        {t("Transaction type")}
         <select {...register("type")} aria-readonly={!!record}>
           {Object.entries(labels).map(([k, v]) => (
             <option key={k} value={k}>
-              {v}
+              {t(v)}
             </option>
           ))}
         </select>
       </label>
       <div className="form-columns">
         <label>
-          Amount (BDT)
+          {t("Amount (BDT)")}
           <input
             autoFocus
             inputMode="decimal"
             placeholder="0.00"
             {...register("amount")}
           />
-          {errors.amount && <em>{errors.amount.message}</em>}
+          {errors.amount && <em>{t(errors.amount.message)}</em>}
         </label>
         <label>
-          {kind === "expense" ? "Date (optional)" : "Date"}
+          {kind === "expense" ? t("Date (optional)") : t("Date")}
           <input type="date" {...register("date")} />
-          {kind === "expense" && <small>Leave blank to use today.</small>}
-          {errors.date && <em>{errors.date.message}</em>}
+          {kind === "expense" && (
+            <small>{t("Leave blank to use today.")}</small>
+          )}
+          {errors.date && <em>{t(errors.date.message)}</em>}
         </label>
       </div>
       {kind === "expense" && (
         <>
           <label>
-            Category
+            {t("Category")}
             <select {...register("category_id")}>
-              <option value="">Choose a category</option>
+              <option value="">{t("Choose a category")}</option>
               {data.expense_categories
                 .filter((c) => c.is_active || c.id === record?.category_id)
                 .map((c) => (
@@ -228,14 +240,14 @@ export function TransactionForm({
                   </option>
                 ))}
             </select>
-            {errors.category_id && <em>{errors.category_id.message}</em>}
+            {errors.category_id && <em>{t(errors.category_id.message)}</em>}
           </label>
           <label>
-            Who paid?
+            {t("Who paid?")}
             <select {...register("funding_source")}>
-              <option value="group_funds">Club cash</option>
+              <option value="group_funds">{t("Club cash")}</option>
               <option value="member_personal">
-                A member paid / provided the items
+                {t("A member paid / provided the items")}
               </option>
             </select>
           </label>
@@ -244,111 +256,137 @@ export function TransactionForm({
       {(kind !== "expense" || personal) && (
         <label>
           {kind === "contribution"
-            ? "Member"
+            ? t("Member")
             : personal
-              ? "Member who paid"
-              : "Lender"}
+              ? t("Member who paid")
+              : t("Lender")}
           <select {...register("member_id")}>
-            <option value="">Choose a member</option>
+            <option value="">{t("Choose a member")}</option>
             {data.members
               .filter((m) => m.is_active || m.id === member)
               .map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
-                  {m.is_me ? " (You)" : ""}
+                  {m.is_me ? t(" (You)") : ""}
                 </option>
               ))}
           </select>
-          {errors.member_id && <em>{errors.member_id.message}</em>}
+          {errors.member_id && <em>{t(errors.member_id.message)}</em>}
         </label>
       )}
       {kind === "loan_repayment" && (
         <div className="info-box">
-          Club still owes this member: <strong>{money(balance)}</strong>
+          {t("Club still owes this member:")}
+          <strong>{money(balance)}</strong>
         </div>
       )}
       {personal ? (
         <>
           <label>
-            Should this count as their payment or a loan?
+            {t("Should this count as their payment or a loan?")}
             <select {...register("personal_settlement")}>
               <option value="contribution">
-                Their entry / weekly fee payment
+                {t("Their entry / weekly fee payment")}
               </option>
-              <option value="loan">A loan the club must repay</option>
+              <option value="loan">{t("A loan the club must repay")}</option>
             </select>
           </label>
           <p className="form-hint">
-            The purchase is recorded once. No money enters or leaves club cash.
+            {t(
+              "The purchase is recorded once. No money enters or leaves club cash.",
+            )}
           </p>
         </>
       ) : (
         <label>
-          Payment method
+          {t("Payment method")}
           <select {...register("payment_method")}>
-            <option value="cash">Cash</option>
-            <option value="bank_transfer">Bank transfer</option>
-            <option value="mobile_wallet">Mobile wallet</option>
-            <option value="other">Other</option>
+            <option value="cash">{t("Cash")}</option>
+            <option value="bank_transfer">{t("Bank transfer")}</option>
+            <option value="mobile_wallet">{t("Mobile wallet")}</option>
+            <option value="other">{t("Other")}</option>
           </select>
         </label>
       )}
       <label>
-        Description
-        <input placeholder="What was this for?" {...register("description")} />
+        {t("Description")}
+        <input
+          placeholder={t("What was this for?")}
+          {...register("description")}
+        />
       </label>
       <label>
-        Notes (optional)
-        <textarea {...register("notes")} placeholder="Any extra details…" />
+        {t("Notes (optional)")}
+        <textarea
+          {...register("notes")}
+          placeholder={t("Any extra details…")}
+        />
       </label>
       {!record?.voided_at && previewAmount > 0 && (
         <div className="live-preview" role="status">
-          <strong>After saving this entry</strong>
+          <strong>{t("After saving this entry")}</strong>
           <p>
             {personal
-              ? "No club cash moves."
-              : `Cash in hand will be ${money(nextCash)}.`}
+              ? t("No club cash moves.")
+              : t("Cash in hand will be {amount}.", {
+                  amount: money(nextCash),
+                })}
           </p>
           {addsFeeCredit && member && (
             <p>
-              {money(Math.min(previewAmount, unpaid))} clears unpaid fees for{" "}
-              {person}.{" "}
+              {t("{amount} clears unpaid fees for {name}.", {
+                amount: money(Math.min(previewAmount, unpaid)),
+                name: person,
+              })}{" "}
               {previewAmount > unpaid
-                ? `${money(previewAmount - unpaid)} stays as extra fee credit. If this money must be repaid, record that part separately as a member loan.`
-                : `${money(Math.max(0, unpaid - previewAmount))} in fees will remain due.`}
+                ? t(
+                    "{amount} stays as extra fee credit. For money to be returned, record that part separately as a member loan.",
+                    { amount: money(previewAmount - unpaid) },
+                  )
+                : t("{amount} in fees will remain due.", {
+                    amount: money(Math.max(0, unpaid - previewAmount)),
+                  })}
             </p>
           )}
           {(kind === "loan_received" || (personal && settlement === "loan")) &&
             member && (
               <p>
-                The club will owe {person} {money(balance + previewAmount)}.
-                Their unpaid fees stay unchanged.
+                {t("The club will owe {name} {amount}.", {
+                  name: person,
+                  amount: money(balance + previewAmount),
+                })}
               </p>
             )}
           {kind === "loan_repayment" && member && (
             <p>
-              The club will still owe {person}{" "}
-              {money(Math.max(0, balance - previewAmount))}.
+              {t("The club will still owe {name} {amount}.", {
+                name: person,
+                amount: money(Math.max(0, balance - previewAmount)),
+              })}
             </p>
           )}
         </div>
       )}
-      {record &&
-        transactionDateLabel(record).startsWith("Original date unknown") && (
-          <p className="form-hint">
-            Original date unknown. This opening record uses its import date.
-            Choose the actual date above if you know it.
-          </p>
-        )}
+      {record && isOriginalDateUnknown(record) && (
+        <p className="form-hint">
+          {t(
+            "Original date unknown. This opening record uses its import date. Choose the actual date above if you know it.",
+          )}
+        </p>
+      )}
       {!record?.voided_at && (
         <div className="form-actions">
           {record && (
             <button type="button" className="button danger" onClick={onVoid}>
-              Void transaction
+              {t("Void transaction")}
             </button>
           )}
           <button disabled={busy} className="button primary" type="submit">
-            {busy ? "Saving…" : record ? "Save changes" : "Save transaction"}
+            {busy
+              ? t("Saving…")
+              : record
+                ? t("Save changes")
+                : t("Save transaction")}
             <Check size={16} />
           </button>
         </div>
@@ -394,35 +432,33 @@ export function MemberForm({
       )}
     >
       <label>
-        Full name
+        {t("Full name")}
         <input
           autoFocus
-          placeholder="Member’s full name"
+          placeholder={t("Member’s full name")}
           {...register("name")}
         />
-        {errors.name && <em>{errors.name.message}</em>}
+        {errors.name && <em>{t(errors.name.message)}</em>}
       </label>
       <label>
-        Phone (optional)
+        {t("Phone (optional)")}
         <input type="tel" {...register("phone")} />
       </label>
       <label>
-        Notes
+        {t("Notes")}
         <textarea {...register("notes")} />
       </label>
       <label className="checkbox">
-        <input type="checkbox" {...register("is_me")} />
-        This is me (the administrator)
-      </label>
-      <label className="checkbox">
         <input type="checkbox" {...register("is_active")} />
-        Active member
+        {t("Active member")}
       </label>
       <p className="form-hint">
-        Uncheck active to archive a member. Their history will be preserved.
+        {t(
+          "Uncheck active to archive a member. Their history will be preserved.",
+        )}
       </p>
       <button className="button primary" disabled={busy}>
-        {busy ? "Saving…" : "Save member"}
+        {busy ? t("Saving…") : t("Save member")}
         <Check size={16} />
       </button>
     </form>
@@ -483,8 +519,7 @@ export function DuesForm({
       }}
     >
       <p className="form-intro">
-        Charge fees for one named period. This does not record a payment.
-        Existing balances remain and the new charge is added.
+        {t("Assign fees for a period. Record payments separately.")}
       </p>
       <div className="fee-presets">
         <button
@@ -495,7 +530,7 @@ export function DuesForm({
             setAmount("500");
           }}
         >
-          Entry fee · ৳500
+          {t("Entry fee · ৳500")}
         </button>
         <button
           type="button"
@@ -505,11 +540,11 @@ export function DuesForm({
             setAmount("100");
           }}
         >
-          Weekly fee · ৳100
+          {t("Weekly fee · ৳100")}
         </button>
       </div>
       <label>
-        Title
+        {t("Title")}
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -519,7 +554,7 @@ export function DuesForm({
       </label>
       <div className="form-columns">
         <label>
-          Default amount (BDT)
+          {t("Default amount (BDT)")}
           <input
             inputMode="decimal"
             value={amount}
@@ -528,7 +563,7 @@ export function DuesForm({
           />
         </label>
         <label>
-          Due date
+          {t("Due date")}
           <input
             type="date"
             value={date}
@@ -544,7 +579,7 @@ export function DuesForm({
             setSelected(e.target.checked ? members.map((m) => m.id) : [])
           }
         />
-        Select all active members
+        {t("Select all active members")}
       </label>
       <div className="dues-selection">
         {members.map((m) => (
@@ -564,9 +599,9 @@ export function DuesForm({
               {m.name}
             </label>
             <input
-              aria-label={"Custom amount for " + m.name}
+              aria-label={t("Custom amount for {name}", { name: m.name })}
               inputMode="decimal"
-              placeholder={amount || "Custom amount"}
+              placeholder={amount || t("Custom amount")}
               value={custom[m.id] || ""}
               onChange={(e) =>
                 setCustom((p) => ({ ...p, [m.id]: e.target.value }))
@@ -575,14 +610,10 @@ export function DuesForm({
           </div>
         ))}
       </div>
-      <p className="form-hint">
-        Set a different amount beside any member. Contributions determine their
-        paid status automatically.
-      </p>
       <div className="live-preview">
-        <strong>Review new charges</strong>
+        <strong>{t("Review new charges")}</strong>
         <p>
-          {title} · {selected.length} selected members
+          {title} · {selected.length} {t("selected members")}
         </p>
         {selected.map((id) => {
           const a = custom[id] || amount;
@@ -595,18 +626,21 @@ export function DuesForm({
           return (
             <div className="fee-preview-row" key={id}>
               <span>{members.find((m) => m.id === id)?.name}</span>
-              <strong>{cents ? money(cents) : "Enter amount"}</strong>
+              <strong>{cents ? money(cents) : t("Enter amount")}</strong>
             </div>
           );
         })}
         <p>
-          Only press assign when the period and members above are correct. This
-          adds fees again if you assign the same period twice.
+          {t(
+            "Assigning twice adds the fees twice. Check the period before saving.",
+          )}
         </p>
       </div>
-      {error && <em>{error}</em>}
+      {error && <em>{t(error)}</em>}
       <button className="button primary" disabled={busy || !members.length}>
-        {busy ? "Assigning…" : "Assign dues to " + selected.length + " members"}
+        {busy
+          ? t("Assigning…")
+          : t("Assign dues to {count} members", { count: selected.length })}
       </button>
     </form>
   );
@@ -634,7 +668,7 @@ export function CategoryForm({
       }}
     >
       <label>
-        Category name
+        {t("Category name")}
         <input
           required
           name="name"
@@ -643,7 +677,7 @@ export function CategoryForm({
         />
       </label>
       <label>
-        Display order
+        {t("Display order")}
         <input
           name="sort_order"
           type="number"
@@ -658,10 +692,10 @@ export function CategoryForm({
           name="is_active"
           defaultChecked={record?.is_active ?? true}
         />
-        Active
+        {t("Active")}
       </label>
       <button className="button primary" disabled={busy}>
-        {busy ? "Saving…" : "Save category"}
+        {busy ? t("Saving…") : t("Save category")}
       </button>
     </form>
   );
@@ -685,21 +719,22 @@ export function VoidForm({
       }}
     >
       <p>
-        This entry will be excluded from all balances. Its original details and
-        your reason remain in the history.
+        {t(
+          "This entry will be excluded from all balances. Its original details and your reason remain in the history.",
+        )}
       </p>
       <label>
-        Reason
+        {t("Reason")}
         <textarea
           required
           name="reason"
           minLength={3}
           maxLength={1000}
-          placeholder="Why is this transaction being voided?"
+          placeholder={t("Why is this transaction being voided?")}
         />
       </label>
       <button className="button danger" disabled={busy}>
-        {busy ? "Voiding…" : "Confirm void transaction"}
+        {busy ? t("Voiding…") : t("Confirm void transaction")}
       </button>
     </form>
   );

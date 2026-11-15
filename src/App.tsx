@@ -1,4 +1,6 @@
+import { t, t as translate, getLanguage } from "./lib/i18n";
 import { weeklyActivity, type ActivityPoint } from "./lib/reporting";
+import { LanguageControl, useLanguage } from "./features/language";
 import { labels } from "./lib/labels";
 import {
   TransactionForm,
@@ -9,6 +11,7 @@ import {
 } from "./features/ledger-forms";
 import { MemberStatement } from "./components/member-statement";
 import {
+  memberCashPaid,
   cashMovement,
   transactionLabel,
   transactionDateLabel,
@@ -41,12 +44,10 @@ import {
   HandCoins,
   MoreHorizontal,
   X,
-  Check,
   LogOut,
   Activity,
   ArrowRight,
   CalendarDays,
-  CircleHelp,
   ShieldCheck,
 } from "lucide-react";
 const LedgerChart = lazy(() => import("./components/ledger-chart"));
@@ -117,6 +118,7 @@ async function insertRecord(
   }
 }
 function App() {
+  useLanguage();
   const [page, setPage] = useState("Dashboard"),
     [chartWeeks, setChartWeeks] = useState(2),
     [session, setSession] = useState<Session | null>(null),
@@ -246,6 +248,33 @@ function App() {
       setBusy(false);
     }
   }
+  async function selectMyMember(id: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (!online) throw new Error("You are offline. Reconnect and try again.");
+      for (const member of data.members.filter((m) => m.is_me && m.id !== id)) {
+        const result = await supabase!
+          .from("members")
+          .update({ is_me: false })
+          .eq("id", member.id);
+        if (result.error) throw result.error;
+      }
+      if (id) {
+        const result = await supabase!
+          .from("members")
+          .update({ is_me: true })
+          .eq("id", id);
+        if (result.error) throw result.error;
+      }
+      setToast("Saved successfully");
+    } catch (e) {
+      notify(e);
+    } finally {
+      await client.invalidateQueries({ queryKey: ["ledger"] });
+      setBusy(false);
+    }
+  }
   async function assign(rows: Record<string, unknown>[]) {
     if (!rows.length) return;
     setBusy(true);
@@ -316,7 +345,7 @@ function App() {
     const rows = filtered.filter((t) => t.transaction_date.slice(0, 7) === key);
     const result = calculate({ ...data, transactions: rows, dues: [] });
     return {
-      label: d.toLocaleString("en", {
+      label: d.toLocaleString(getLanguage() === "bn" ? "bn-BD" : "en", {
         month: "short",
         year: monthCount > 12 ? "2-digit" : undefined,
       }),
@@ -360,7 +389,7 @@ function App() {
                 <Icon size={19} />
               </span>
               <span className="tx-main">
-                <strong>{t.description || labels[t.type]}</strong>
+                <strong>{t.description || translate(labels[t.type])}</strong>
                 <small>
                   <span className="tx-mobile-type">
                     {transactionLabel(t)} ·{" "}
@@ -368,7 +397,7 @@ function App() {
                   {member?.name ||
                     data.expense_categories.find((c) => c.id === t.category_id)
                       ?.name ||
-                    "Group funds"}{" "}
+                    translate("Group funds")}{" "}
                   <span>· {transactionDateLabel(t)}</span>
                 </small>
               </span>
@@ -382,12 +411,19 @@ function App() {
                 {money(minor(t.amount))}
                 <small>
                   {t.voided_at
-                    ? "Voided"
+                    ? translate("Voided")
                     : t.funding_source === "member_personal"
                       ? t.personal_settlement === "contribution"
-                        ? "Fees credited · no cash moved"
-                        : "Loan added · no cash moved"
-                      : (t.payment_method || "").replaceAll("_", " ")}
+                        ? translate("Fees credited · no cash moved")
+                        : translate("Loan added · no cash moved")
+                      : translate(
+                          {
+                            cash: "Cash",
+                            bank_transfer: "Bank transfer",
+                            mobile_wallet: "Mobile wallet",
+                            other: "Other",
+                          }[t.payment_method || ""] || "",
+                        )}
                 </small>
               </span>
               <ChevronRight size={15} className="muted" />
@@ -397,8 +433,8 @@ function App() {
       </div>
     ) : (
       <Empty
-        title="No transactions yet"
-        text="Your financial history starts with the first entry."
+        title={translate("No transactions yet")}
+        text={translate("Your financial history starts with the first entry.")}
       />
     );
   }
@@ -406,12 +442,15 @@ function App() {
     return (
       <div className="auth-page">
         <section className="auth-card">
-          <h1>Connection not configured</h1>
-          <p>Set the Supabase URL and publishable key to use your ledger.</p>
+          <h1>{t("Connection not configured")}</h1>
+          <p>
+            {t("Set the Supabase URL and publishable key to use your ledger.")}
+          </p>
         </section>
       </div>
     );
-  if (!authReady) return <div className="loading">Opening your ledger…</div>;
+  if (!authReady)
+    return <div className="loading">{t("Opening your ledger…")}</div>;
   if (recovering)
     return (
       <Auth
@@ -433,7 +472,7 @@ function App() {
     );
   if (!access.data.is_admin) {
     if (query.isPending)
-      return <div className="loading">Loading your club…</div>;
+      return <div className="loading">{t("Loading your club…")}</div>;
     if (query.isError)
       return (
         <AccessScreen
@@ -463,12 +502,12 @@ function App() {
         <div className="workspace">
           <span className="club-logo">B</span>
           <div>
-            <strong>Our badminton club</strong>
-            <small>Club ledger</small>
+            <strong>{t("Our badminton club")}</strong>
+            <small>{t("Club ledger")}</small>
           </div>
           <MoreHorizontal size={17} />
         </div>
-        <div className="nav-caption">WORKSPACE</div>
+        <div className="nav-caption">{t("WORKSPACE")}</div>
         <nav>
           {nav.map(([name, Icon]) => (
             <button
@@ -477,26 +516,17 @@ function App() {
               onClick={() => go(name)}
             >
               <Icon size={19} />
-              <span>{name}</span>
+              <span>{t(name)}</span>
               {name === "Dues" && pending.length > 0 && <b>{pending.length}</b>}
             </button>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-note">
-            <ShieldCheck size={21} />
-            <strong>
-              A little clarity.
-              <br />
-              More time on court.
-            </strong>
-            <p>Your club’s money, all in one place.</p>
-          </div>
           <button className="profile" onClick={() => go("Settings")}>
             <span className="avatar">{my?.name.slice(0, 1) || "A"}</span>
             <span>
-              <strong>{my?.name || "Administrator"}</strong>
-              <small>Club administrator</small>
+              <strong>{my?.name || t("Administrator")}</strong>
+              <small>{t("Club administrator")}</small>
             </span>
             <Settings size={17} />
           </button>
@@ -509,24 +539,15 @@ function App() {
             <strong>Badminton Ledger</strong>
           </span>
           <span className="breadcrumb">
-            Workspace <ChevronRight size={14} /> <strong>{page}</strong>
+            {t("Workspace")}
+            <ChevronRight size={14} /> <strong>{t(page)}</strong>
           </span>
           <span className="top-right">
             <span className="sync">
               <span className={"status-dot " + (!online ? "offline" : "")} />
-              {online ? "Connected" : "Offline"}
+              {online ? t("Connected") : t("Offline")}
             </span>
-            <button
-              className="icon-button"
-              aria-label="Help"
-              onClick={() =>
-                setToast(
-                  "Record contributions, expenses and loans. All balances are calculated automatically.",
-                )
-              }
-            >
-              <CircleHelp size={19} />
-            </button>
+            <LanguageControl compact />
             <ThemeControl compact />
             <span className="avatar small">{my?.name.slice(0, 1) || "A"}</span>
           </span>
@@ -534,36 +555,20 @@ function App() {
         <main>
           {!online && (
             <div className="error-banner">
-              You’re offline. Reconnect to save changes.
+              {t("You’re offline. Reconnect to save changes.")}
             </div>
           )}
           {query.isError && (
             <div className="error-banner">
-              Could not load your ledger: {query.error.message}
-              <button onClick={() => query.refetch()}>Retry</button>
+              {t("Could not load your ledger:")}
+              {query.error.message}
+              <button onClick={() => query.refetch()}>{t("Retry")}</button>
             </div>
           )}
           <div className="page-heading">
             <div>
-              <div className="eyebrow">YOUR CLUB, IN BALANCE</div>
-              <h1>
-                {page === "Dashboard" ? "A clear view of your finances." : page}
-              </h1>
-              <p>
-                {
-                  (
-                    {
-                      Dashboard: "Less bookkeeping. More badminton.",
-                      Transactions:
-                        "Fee payments, purchases, loans and repayments.",
-                      Members: "The people who keep the game going.",
-                      Dues: "Know what’s paid and what’s still to come.",
-                      Reports: "A little perspective on your club’s finances.",
-                      Settings: "Make this space your own.",
-                    } as Record<string, string>
-                  )[page]
-                }
-              </p>
+              <div className="eyebrow">{t("YOUR CLUB, IN BALANCE")}</div>
+              <h1>{t(page)}</h1>
             </div>
             <div className="heading-actions">
               {page === "Dashboard" ? (
@@ -577,7 +582,7 @@ function App() {
                   onClick={exportTransactions}
                 >
                   <Download size={16} />
-                  Export CSV
+                  {t("Export CSV")}
                 </button>
               )}
               <button
@@ -594,10 +599,10 @@ function App() {
               >
                 <Plus size={17} />
                 {page === "Members"
-                  ? "Add member"
+                  ? t("Add member")
                   : page === "Dues"
-                    ? "Assign dues"
-                    : "Add transaction"}
+                    ? t("Assign dues")
+                    : t("Add transaction")}
               </button>
             </div>
           </div>
@@ -605,23 +610,20 @@ function App() {
             <div className="onboarding panel">
               <ShieldCheck size={25} />
               <div>
-                <h3>Welcome to your club’s ledger.</h3>
-                <p>
-                  Add yourself as a member and check ‘This is me’. Your expense
-                  categories will be set up automatically.
-                </p>
+                <h3>{t("Welcome to your club’s ledger.")}</h3>
+                <p>{t("Add members to start your ledger.")}</p>
               </div>
               <button
                 className="button primary"
                 onClick={() => setEdit({ kind: "member" })}
               >
-                Add your first member
+                {t("Add your first member")}
                 <Plus size={16} />
               </button>
             </div>
           )}
           {query.isLoading ? (
-            <div className="panel loading">Loading your ledger…</div>
+            <div className="panel loading">{t("Loading your ledger…")}</div>
           ) : (
             <>
               {page === "Dashboard" && (
@@ -632,33 +634,35 @@ function App() {
                       onClick={() => setEdit({ kind: "cash" })}
                     >
                       <div className="stat-label">
-                        Cash in hand <Wallet size={18} />
+                        {t("Cash in hand")}
+                        <Wallet size={18} />
                       </div>
                       <div className="stat-value">{money(totals.funds)}</div>
                       <div className="stat-footer">
-                        Money the club can spend now <ChevronRight size={15} />
+                        {t("Available cash")}
+                        <ChevronRight size={15} />
                       </div>
                     </button>
                     {[
                       {
-                        name: "Members still owe",
+                        name: t("Members still owe"),
                         value: totals.outstanding,
                         icon: Users,
-                        detail: `${pending.length} members have unpaid fees`,
+                        detail: t("{count} members", { count: pending.length }),
                         action: () => go("Dues"),
                       },
                       {
-                        name: "Club must repay",
+                        name: t("Club must repay"),
                         value: totals.loans,
                         icon: HandCoins,
-                        detail: "Money lent by members, not unpaid fees",
+                        detail: t("Member loans"),
                         action: () => setEdit({ kind: "loans" }),
                       },
                       {
-                        name: "Total spent",
+                        name: t("Total spent"),
                         value: totals.expenses,
                         icon: Receipt,
-                        detail: `${money(cash.cashExpenses)} cash + ${money(cash.memberPurchases)} member-funded`,
+                        detail: t("All spending"),
                         action: () => {
                           go("Transactions");
                           setFilter("expense");
@@ -667,27 +671,19 @@ function App() {
                     ].map((s) => (
                       <button className="stat" key={s.name} onClick={s.action}>
                         <div className="stat-label">
-                          {s.name}
+                          {t(s.name)}
                           <s.icon size={18} />
                         </div>
                         <div className="stat-value">{money(s.value)}</div>
                         <div className="stat-footer">
-                          {s.detail}
+                          {t(s.detail)}
                           <ChevronRight size={15} />
                         </div>
                       </button>
                     ))}
                   </div>
-                  <div className="balance-explainer">
-                    <ShieldCheck size={18} />
-                    <span>
-                      <strong>Two different directions:</strong> members owe the
-                      club unpaid fees. The club owes members money they lent.
-                      These balances do not cancel each other.
-                    </span>
-                  </div>
                   <div className="quick-actions">
-                    <span>QUICK ADD</span>
+                    <span>{t("QUICK ADD")}</span>
                     {(
                       [
                         "contribution",
@@ -705,14 +701,14 @@ function App() {
                           <span className={"quick-icon " + type}>
                             <Icon size={16} />
                           </span>
-                          {
+                          {t(
                             {
                               contribution: "Someone paid money",
                               expense: "Club bought something",
                               loan_received: "Member lent money",
                               loan_repayment: "Repay a member",
-                            }[type]
-                          }
+                            }[type],
+                          )}
                           <Plus size={14} />
                         </button>
                       );
@@ -729,22 +725,24 @@ function App() {
                       <span className="quick-icon expense">
                         <Receipt size={16} />
                       </span>
-                      Someone provided items
+                      {t("Someone provided items")}
                       <Plus size={14} />
                     </button>
                     <button onClick={() => setEdit({ kind: "dues" })}>
                       <span className="quick-icon dues">
                         <ClipboardList size={16} />
                       </span>
-                      Assign dues
+                      {t("Assign dues")}
                       <Plus size={14} />
                     </button>
                   </div>
                   <div className="dashboard-columns">
                     <section className="panel chart-panel">
                       <PanelTitle
-                        title="Cash in, cash out"
-                        subtitle="Weekly cash received and spent · Monday–Sunday"
+                        title={t("Cash in, cash out")}
+                        subtitle={t(
+                          "Weekly cash received and spent · Monday–Sunday",
+                        )}
                         right={
                           <select
                             className="period chart-period"
@@ -756,7 +754,7 @@ function App() {
                           >
                             {[2, 4, 8, 12].map((n) => (
                               <option key={n} value={n}>
-                                Last {n} weeks
+                                {t("Last {count} weeks", { count: n })}
                               </option>
                             ))}
                           </select>
@@ -765,26 +763,24 @@ function App() {
                       <div className="chart-legend">
                         <span>
                           <i className="green-bg" />
-                          Cash received (fees + loans)
+                          {t("Cash received (fees + loans)")}
                         </span>
                         <span>
                           <i className="orange-bg" />
-                          Cash spent / repaid
+                          {t("Cash spent / repaid")}
                         </span>
                       </div>
                       <Chart data={weekly} cash />
-                      <p className="chart-note">
-                        Items provided by members do not move club cash. Undated
-                        opening records appear in their import week.
-                      </p>
                     </section>
                     <section className="panel dues-panel">
                       <PanelTitle
-                        title="Who still needs to pay?"
-                        subtitle="Unpaid entry and weekly fees. Loans are separate."
+                        title={t("Who still needs to pay?")}
+                        subtitle={t(
+                          "Unpaid entry and weekly fees. Loans are separate.",
+                        )}
                         right={
                           <span className="count-pill">
-                            {pending.length} members
+                            {t("{count} members", { count: pending.length })}
                           </span>
                         }
                       />
@@ -810,7 +806,7 @@ function App() {
                                   Math.max(1, totals.members[m.id].assigned)) *
                                   100,
                               )}
-                              % contributed
+                              {t("% paid")}
                             </small>
                           </span>
                           <strong>
@@ -820,26 +816,28 @@ function App() {
                       ))}
                       {!pending.length && (
                         <Empty
-                          title="All caught up"
-                          text="No outstanding member dues."
+                          title={t("All caught up")}
+                          text={t("No outstanding member dues.")}
                         />
                       )}
                       <button className="panel-link" onClick={() => go("Dues")}>
-                        View all dues <ArrowRight size={15} />
+                        {t("View all dues")}
+                        <ArrowRight size={15} />
                       </button>
                     </section>
                   </div>
                   <div className="dashboard-columns bottom">
                     <section className="panel">
                       <PanelTitle
-                        title="Recent transactions"
-                        subtitle="The latest from your ledger."
+                        title={t("Recent transactions")}
+                        subtitle={t("The latest from your ledger.")}
                         right={
                           <button
                             className="text-button"
                             onClick={() => go("Transactions")}
                           >
-                            View all <ArrowRight size={14} />
+                            {t("View all")}
+                            <ArrowRight size={14} />
                           </button>
                         }
                       />
@@ -855,54 +853,42 @@ function App() {
                           .slice(0, 4)}
                       />
                     </section>
-                    <div className="personal-stack">
-                      <section className="panel personal">
-                        <div className="personal-header">
-                          <span className="tx-icon contribution">
-                            <Users size={20} />
-                          </span>
-                          <span>YOUR FEE PAYMENTS</span>
-                          <span className="you-pill">You</span>
-                        </div>
-                        <h2>{money(my ? totals.members[my.id].credit : 0)}</h2>
-                        <p>This counts toward your entry and weekly fees.</p>
-                        {my && (
+                    <section className="panel member-payments">
+                      <PanelTitle
+                        title={t("Member payments")}
+                        subtitle=""
+                        right={
                           <button
                             className="text-button"
-                            onClick={() =>
-                              setEdit({ kind: "details", member: my })
-                            }
+                            onClick={() => go("Members")}
                           >
-                            View your statement <ArrowRight size={14} />
+                            {t("View all")}
                           </button>
-                        )}
-                        <div>
-                          <span>Cash payments + items credited</span>
-                          <Check size={16} />
-                        </div>
-                      </section>
-                      <button
-                        className="panel loan-card"
-                        onClick={() => {
-                          setEdit({ kind: "loans" });
-                        }}
-                      >
-                        <span className="tx-icon loan_received">
-                          <HandCoins size={20} />
-                        </span>
-                        <span>
-                          <small>Club owes members</small>
-                          <strong>{money(totals.loans)}</strong>
-                        </span>
-                        <ChevronRight size={19} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="page-foot">
-                    <span>
-                      <ShieldCheck size={14} /> Every taka accounted for.
-                    </span>
-                    <span>Made for the game. Built for peace of mind.</span>
+                        }
+                      />
+                      {active.map((m) => (
+                        <button
+                          className="member-payment-row"
+                          key={m.id}
+                          onClick={() =>
+                            setEdit({ kind: "details", member: m })
+                          }
+                        >
+                          <span className="avatar">{m.name[0]}</span>
+                          <span>
+                            <strong>{m.name}</strong>
+                            <small>{t("Total paid")}</small>
+                          </span>
+                          <strong>
+                            {money(
+                              memberCashPaid(data, m.id) +
+                                totals.members[m.id].purchases,
+                            )}
+                          </strong>
+                          <ChevronRight size={15} />
+                        </button>
+                      ))}
+                    </section>
                   </div>
                 </>
               )}
@@ -912,29 +898,29 @@ function App() {
                     <label className="search">
                       <Search size={17} />
                       <input
-                        placeholder="Search transactions…"
+                        placeholder={t("Search transactions…")}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
                     </label>
                     <select
-                      aria-label="Transaction type"
+                      aria-label={t("Transaction type")}
                       value={filter}
                       onChange={(e) => setFilter(e.target.value)}
                     >
-                      <option value="all">All transactions</option>
+                      <option value="all">{t("All transactions")}</option>
                       {Object.entries(labels).map(([k, v]) => (
                         <option key={k} value={k}>
-                          {v}
+                          {t(v)}
                         </option>
                       ))}
                     </select>
                     <select
-                      aria-label="Member filter"
+                      aria-label={t("Member filter")}
                       value={memberFilter}
                       onChange={(e) => setMemberFilter(e.target.value)}
                     >
-                      <option value="">All members</option>
+                      <option value="">{t("All members")}</option>
                       {data.members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
@@ -942,11 +928,11 @@ function App() {
                       ))}
                     </select>
                     <select
-                      aria-label="Category filter"
+                      aria-label={t("Category filter")}
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
                     >
-                      <option value="">All categories</option>
+                      <option value="">{t("All categories")}</option>
                       {data.expense_categories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -965,13 +951,14 @@ function App() {
                       className={memberView === "active" ? "active" : ""}
                       onClick={() => setMemberView("active")}
                     >
-                      Active members <span>{active.length}</span>
+                      {t("Active members")}
+                      <span>{active.length}</span>
                     </button>
                     <button
                       className={memberView === "archived" ? "active" : ""}
                       onClick={() => setMemberView("archived")}
                     >
-                      Archived
+                      {t("Archived")}
                     </button>
                   </div>
                   <div className="member-grid">
@@ -990,7 +977,7 @@ function App() {
                               </span>
                               <button
                                 className="icon-button"
-                                aria-label={"Edit " + m.name}
+                                aria-label={t("Edit {name}", { name: m.name })}
                                 onClick={() =>
                                   setEdit({ kind: "member", record: m })
                                 }
@@ -998,29 +985,46 @@ function App() {
                                 <MoreHorizontal size={21} />
                               </button>
                             </div>
-                            <h3>
-                              {m.name}{" "}
-                              {m.is_me && <span className="you-pill">You</span>}
-                            </h3>
-                            <p>{m.phone || "Club member"}</p>
+                            <button
+                              className="member-name"
+                              onClick={() =>
+                                setEdit({ kind: "details", member: m })
+                              }
+                            >
+                              <h3>{m.name}</h3>
+                            </button>
+                            <p>{m.phone || t("Club member")}</p>
+                            <button
+                              className="member-total"
+                              onClick={() =>
+                                setEdit({ kind: "details", member: m })
+                              }
+                            >
+                              <span>{t("Total paid")}</span>
+                              <strong>
+                                {money(
+                                  memberCashPaid(data, m.id) + b.purchases,
+                                )}
+                              </strong>
+                            </button>
                             <dl>
                               <div>
-                                <dt>Counted toward fees</dt>
-                                <dd className="green">{money(b.credit)}</dd>
+                                <dt>{t("Cash given")}</dt>
+                                <dd>{money(memberCashPaid(data, m.id))}</dd>
                               </div>
                               <div>
-                                <dt>Expected payment</dt>
-                                <dd>{money(b.assigned)}</dd>
+                                <dt>{t("Spent personally")}</dt>
+                                <dd>{money(b.purchases)}</dd>
                               </div>
                               <div>
-                                <dt>Still due</dt>
+                                <dt>{t("Still due")}</dt>
                                 <dd className={b.outstanding ? "orange" : ""}>
                                   {money(b.outstanding)}
                                 </dd>
                               </div>
                               {b.loans > 0 && (
                                 <div>
-                                  <dt>Club owes member</dt>
+                                  <dt>{t("Club owes member")}</dt>
                                   <dd>{money(b.loans)}</dd>
                                 </div>
                               )}
@@ -1031,7 +1035,8 @@ function App() {
                                 setEdit({ kind: "details", member: m })
                               }
                             >
-                              View statement <ArrowRight size={15} />
+                              {t("View payments")}
+                              <ArrowRight size={15} />
                             </button>
                           </section>
                         );
@@ -1039,8 +1044,10 @@ function App() {
                   </div>
                   {!data.members.length && (
                     <Empty
-                      title="Who’s playing?"
-                      text="Add your first member to start tracking contributions."
+                      title={t("Who’s playing?")}
+                      text={t(
+                        "Add your first member to start tracking contributions.",
+                      )}
                     />
                   )}
                 </>
@@ -1049,7 +1056,7 @@ function App() {
                 <>
                   <div className="mini-stats">
                     <div className="panel">
-                      <small>Total fees charged</small>
+                      <small>{t("Total fees charged")}</small>
                       <h2>
                         {money(
                           Object.values(totals.members).reduce(
@@ -1060,11 +1067,11 @@ function App() {
                       </h2>
                     </div>
                     <div className="panel">
-                      <small>Still due</small>
+                      <small>{t("Still due")}</small>
                       <h2>{money(totals.outstanding)}</h2>
                     </div>
                     <div className="panel">
-                      <small>Members fully paid</small>
+                      <small>{t("Members fully paid")}</small>
                       <h2>
                         {
                           data.members.filter(
@@ -1078,8 +1085,10 @@ function App() {
                   </div>
                   <section className="panel">
                     <PanelTitle
-                      title="Member balances"
-                      subtitle="Cash fee payments and items credited toward fees reduce these balances. Loans do not."
+                      title={t("Member balances")}
+                      subtitle={t(
+                        "Cash fee payments and items credited toward fees reduce these balances. Loans do not.",
+                      )}
                     />
                     {data.members.map((m, i) => {
                       const b = totals.members[m.id];
@@ -1108,16 +1117,18 @@ function App() {
                             }
                           >
                             {!b.assigned
-                              ? "No dues"
+                              ? t("No dues")
                               : !b.outstanding
-                                ? "Paid"
+                                ? t("Paid")
                                 : b.credit
-                                  ? "Partially paid"
-                                  : "Unpaid"}
+                                  ? t("Partially paid")
+                                  : t("Unpaid")}
                           </span>
                           <span>
                             {money(b.outstanding)}
-                            <small>of {money(b.assigned)}</small>
+                            <small>
+                              {t("of")} {money(b.assigned)}
+                            </small>
                           </span>
                           <ChevronRight size={16} />
                         </button>
@@ -1126,8 +1137,10 @@ function App() {
                   </section>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Expected payment"
-                      subtitle="Entry fees and weekly periods charged to each member."
+                      title={t("Expected payment")}
+                      subtitle={t(
+                        "Entry fees and weekly periods charged to each member.",
+                      )}
                     />
                     {data.dues
                       .filter((d) => !d.voided_at)
@@ -1143,7 +1156,7 @@ function App() {
                               ·{" "}
                               {d.due_date
                                 ? day(d.due_date + "T12:00:00+06:00")
-                                : "No due date"}
+                                : t("No due date")}
                             </small>
                           </span>
                           <strong>{money(minor(d.amount))}</strong>
@@ -1177,21 +1190,21 @@ function App() {
                       }}
                     >
                       <Download size={16} />
-                      Member balances CSV
+                      {t("Member balances CSV")}
                     </button>
                   </div>
                   <div className="dashboard-columns">
                     <section className="panel chart-panel">
                       <PanelTitle
-                        title="Monthly fees received & spending"
-                        subtitle="BDT · non-voided transactions"
+                        title={t("Monthly fees received & spending")}
+                        subtitle={t("BDT · non-voided transactions")}
                       />
                       <Chart data={monthly} />
                     </section>
                     <section className="panel">
                       <PanelTitle
-                        title="Expenses by category"
-                        subtitle="All funding sources included"
+                        title={t("Expenses by category")}
+                        subtitle={t("All funding sources included")}
                       />
                       {data.expense_categories.map((c) => {
                         const value = data.transactions
@@ -1228,8 +1241,10 @@ function App() {
                   </div>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Fee payments by member"
-                      subtitle="Cash and member-funded purchases counted toward fees · selected period"
+                      title={t("Fee payments by member")}
+                      subtitle={t(
+                        "Cash and member-funded purchases counted toward fees · selected period",
+                      )}
                     />
                     {data.members.map((m) => {
                       const txs = filtered.filter(
@@ -1253,8 +1268,10 @@ function App() {
                   </section>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Cash balance history"
-                      subtitle="Cash received minus cash spent / repaid · member-funded purchases excluded"
+                      title={t("Cash balance history")}
+                      subtitle={t(
+                        "Cash received minus cash spent / repaid · member-funded purchases excluded",
+                      )}
                     />
                     {(() => {
                       let running = 0;
@@ -1284,7 +1301,9 @@ function App() {
                       return rows.reverse().map(({ t, running, effect }) => (
                         <div className="assigned-row" key={t.id}>
                           <span>
-                            <strong>{t.description || labels[t.type]}</strong>
+                            <strong>
+                              {t.description || translate(labels[t.type])}
+                            </strong>
                             <small>
                               {day(t.transaction_date)} ·{" "}
                               {effect < 0 ? "−" : "+"}
@@ -1298,19 +1317,23 @@ function App() {
                   </section>
                   <section className="panel assigned">
                     <PanelTitle
-                      title="Money the club owes back"
-                      subtitle="Balances include all prior activity; date filters limit displayed transactions."
+                      title={t("Money the club owes back")}
+                      subtitle={t(
+                        "Balances include all prior activity; date filters limit displayed transactions.",
+                      )}
                     />
                     <div className="report-summary">
                       <span>
-                        Cash in hand <strong>{money(totals.funds)}</strong>
+                        {t("Cash in hand")}
+                        <strong>{money(totals.funds)}</strong>
                       </span>
                       <span>
-                        Club must repay <strong>{money(totals.loans)}</strong>
+                        {t("Club must repay")}
+                        <strong>{money(totals.loans)}</strong>
                       </span>
                       {my && (
                         <span>
-                          Club owes you{" "}
+                          {t("Club owes you")}{" "}
                           <strong>{money(totals.members[my.id].loans)}</strong>
                         </span>
                       )}
@@ -1324,23 +1347,26 @@ function App() {
                   <AdminSettings />
                   <section className="panel">
                     <PanelTitle
-                      title="Your account"
-                      subtitle="One club. One simple ledger."
+                      title={t("Your account")}
+                      subtitle={t("One club. One simple ledger.")}
                     />
                     <div className="settings-body">
                       <label>
-                        Account email
+                        {t("Account email")}
                         <input
                           readOnly
                           value={session.user.email || "Administrator"}
                         />
                       </label>
                       <label>
-                        Currency
-                        <input readOnly value="Bangladeshi Taka (BDT · ৳)" />
+                        {t("Currency")}
+                        <input
+                          readOnly
+                          value={t("Bangladeshi Taka (BDT · ৳)")}
+                        />
                       </label>
                       <label>
-                        Timezone
+                        {t("Timezone")}
                         <input readOnly value="Asia/Dhaka (UTC+06:00)" />
                       </label>
                       <button
@@ -1348,7 +1374,7 @@ function App() {
                         onClick={exportTransactions}
                       >
                         <Download size={16} />
-                        Export all transactions
+                        {t("Export all transactions")}
                       </button>
                       {session && (
                         <button
@@ -1360,21 +1386,37 @@ function App() {
                           }}
                         >
                           <LogOut size={16} />
-                          Log out
+                          {t("Log out")}
                         </button>
                       )}
+                      <LanguageControl />
+                      <label>
+                        {t("My member profile")}
+                        <select
+                          value={my?.id || ""}
+                          disabled={busy}
+                          onChange={(e) => void selectMyMember(e.target.value)}
+                        >
+                          <option value="">{t("Not linked")}</option>
+                          {data.members.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <ThemeControl />
                       <UpdateControl />
                     </div>
                   </section>
                   <section className="panel">
                     <PanelTitle
-                      title="Expense categories"
-                      subtitle="Keep your spending organized."
+                      title={t("Expense categories")}
+                      subtitle={t("Keep your spending organized.")}
                       right={
                         <button
                           className="icon-button"
-                          aria-label="Add category"
+                          aria-label={t("Add category")}
                           onClick={() => setEdit({ kind: "category" })}
                         >
                           <Plus size={20} />
@@ -1393,8 +1435,8 @@ function App() {
                         <span>
                           {c.name}
                           <small>
-                            {c.is_active ? "Active" : "Inactive"} · Order{" "}
-                            {c.sort_order}
+                            {c.is_active ? t("Active") : t("Inactive")} ·{" "}
+                            {t("Order")} {c.sort_order}
                           </small>
                         </span>
                         <ChevronRight size={16} />
@@ -1429,7 +1471,7 @@ function App() {
                           }
                         }}
                       >
-                        Set up default categories
+                        {t("Set up default categories")}
                       </button>
                     )}
                   </section>
@@ -1446,25 +1488,25 @@ function App() {
               onClick={() => go(name)}
             >
               <Icon size={21} />
-              <span>{name}</span>
+              <span>{t(name)}</span>
             </button>
           ))}
           <button
-            aria-label="Settings"
+            aria-label={t("Settings")}
             className={page === "Settings" ? "selected" : ""}
             onClick={() => go("Settings")}
           >
             <Settings size={21} />
-            <span>Settings</span>
+            <span>{t("Settings")}</span>
           </button>
         </nav>
       </div>
       {toast && (
         <div className="toast" role="status">
           <Activity size={17} />
-          {toast}
+          {t(toast)}
           <button
-            aria-label="Dismiss notification"
+            aria-label={t("Dismiss notification")}
             onClick={() => setToast("")}
           >
             <X size={16} />
@@ -1475,25 +1517,25 @@ function App() {
         <Modal
           title={
             edit.kind === "start"
-              ? "What happened?"
+              ? t("What happened?")
               : edit.kind === "cash"
-                ? "Where is the club’s cash?"
+                ? t("Where is the club’s cash?")
                 : edit.kind === "loans"
-                  ? "Who must the club repay?"
+                  ? t("Who must the club repay?")
                   : edit.kind === "transaction"
                     ? edit.record
-                      ? "Transaction details"
-                      : labels[edit.type]
+                      ? t("Transaction details")
+                      : t(labels[edit.type])
                     : edit.kind === "member"
                       ? edit.record
-                        ? "Edit member"
-                        : "Add a member"
+                        ? t("Edit member")
+                        : t("Add a member")
                       : edit.kind === "dues"
-                        ? "Assign dues"
+                        ? t("Assign dues")
                         : edit.kind === "category"
-                          ? "Expense category"
+                          ? t("Expense category")
                           : edit.kind === "void"
-                            ? "Void transaction"
+                            ? t("Void transaction")
                             : edit.member.name
           }
           onClose={() => !busy && setEdit(null)}
@@ -1502,29 +1544,29 @@ function App() {
             <div className="entry-choices">
               {[
                 {
-                  title: "Someone paid money",
-                  detail: "A member paid entry or weekly fees.",
+                  title: t("Someone paid money"),
+                  detail: t("A member paid entry or weekly fees."),
                   type: "contribution" as Kind,
                 },
                 {
-                  title: "The club bought something",
-                  detail: "An expense paid from club cash.",
+                  title: t("The club bought something"),
+                  detail: t("An expense paid from club cash."),
                   type: "expense" as Kind,
                 },
                 {
-                  title: "Someone provided items",
-                  detail: "Items or a purchase paid personally by a member.",
+                  title: t("Someone provided items"),
+                  detail: t("Items or a purchase paid personally by a member."),
                   type: "expense" as Kind,
                   personal: true,
                 },
                 {
-                  title: "A member lent money",
-                  detail: "The club receives cash it must repay later.",
+                  title: t("A member lent money"),
+                  detail: t("The club receives cash it must repay later."),
                   type: "loan_received" as Kind,
                 },
                 {
-                  title: "The club repaid someone",
-                  detail: "Return part or all of a member’s loan.",
+                  title: t("The club repaid someone"),
+                  detail: t("Return part or all of a member’s loan."),
                   type: "loan_repayment" as Kind,
                 },
               ].map((choice) => (
@@ -1540,8 +1582,7 @@ function App() {
                   }
                 >
                   <span>
-                    <strong>{choice.title}</strong>
-                    <small>{choice.detail}</small>
+                    <strong>{t(choice.title)}</strong>
                   </span>
                   <ChevronRight size={18} />
                 </button>
@@ -1549,24 +1590,20 @@ function App() {
             </div>
           ) : edit.kind === "cash" ? (
             <div className="member-statement">
-              <p>
-                Cash includes fee payments and money lent to the club. Items
-                paid for personally never enter this balance.
-              </p>
               <dl className="statement-lines">
                 <div>
                   <dt>
-                    Cash received from members{" "}
-                    <small>Fee payments + loans</small>
+                    {t("Cash received from members")}{" "}
+                    <small>{t("Fee payments + loans")}</small>
                   </dt>
                   <dd>{money(cash.cashIn)}</dd>
                 </div>
                 <div>
-                  <dt>Cash spent / repaid</dt>
+                  <dt>{t("Cash spent / repaid")}</dt>
                   <dd>−{money(cash.cashOut)}</dd>
                 </div>
                 <div className="statement-emphasis">
-                  <dt>Cash in hand now</dt>
+                  <dt>{t("Cash in hand now")}</dt>
                   <dd>{money(totals.funds)}</dd>
                 </div>
               </dl>
@@ -1577,15 +1614,11 @@ function App() {
                   go("Transactions");
                 }}
               >
-                See all money movements
+                {t("See all money movements")}
               </button>
             </div>
           ) : edit.kind === "loans" ? (
             <div className="member-statement">
-              <p>
-                This is money the club must return to members. It is separate
-                from their entry and weekly fees.
-              </p>
               {data.members
                 .filter((m) => totals.members[m.id].loans > 0)
                 .map((m) => (
@@ -1597,15 +1630,15 @@ function App() {
                     <span>
                       <strong>
                         {m.name}
-                        {m.is_me ? " (You)" : ""}
+                        {m.is_me ? t(" (You)") : ""}
                       </strong>
-                      <small>Club owes this member</small>
+                      <small>{t("Club owes this member")}</small>
                     </span>
                     <strong>{money(totals.members[m.id].loans)}</strong>
                   </button>
                 ))}
               {totals.loans === 0 && (
-                <p>No member loans remain to be repaid.</p>
+                <p>{t("No member loans remain to be repaid.")}</p>
               )}
             </div>
           ) : edit.kind === "transaction" ? (
@@ -1652,16 +1685,12 @@ function App() {
             />
           ) : (
             <>
-              <MemberStatement data={data} member={edit.member} />
-              <h3 className="statement-history-title">
-                Payments, purchases and repayments
-              </h3>
-              <TxList
-                rows={data.transactions.filter(
-                  (t) =>
-                    t.member_id === edit.member.id ||
-                    t.paid_by_member_id === edit.member.id,
-                )}
+              <MemberStatement
+                data={data}
+                member={edit.member}
+                onTransaction={(record) =>
+                  setEdit({ kind: "transaction", type: record.type, record })
+                }
               />
             </>
           )}
@@ -1682,8 +1711,8 @@ function PanelTitle({
   return (
     <div className="panel-heading">
       <div>
-        <h3>{title}</h3>
-        <p>{subtitle}</p>
+        <h3>{t(title)}</h3>
+        <span className="sr-only">{subtitle}</span>
       </div>
       {right}
     </div>
@@ -1693,8 +1722,8 @@ function Empty({ title, text }: { title: string; text: string }) {
   return (
     <div className="empty">
       <Receipt size={25} />
-      <h3>{title}</h3>
-      <p>{text}</p>
+      <h3>{t(title)}</h3>
+      <p>{t(text)}</p>
     </div>
   );
 }
@@ -1706,7 +1735,9 @@ function Chart({
   cash?: boolean;
 }) {
   return (
-    <Suspense fallback={<div className="chart loading">Loading chart…</div>}>
+    <Suspense
+      fallback={<div className="chart loading">{t("Loading chart…")}</div>}
+    >
       <LedgerChart data={data} cash={cash} />
     </Suspense>
   );
@@ -1725,14 +1756,14 @@ function DateFilters({
   return (
     <div className="date-filters">
       <input
-        aria-label="From date"
+        aria-label={t("From date")}
         type="date"
         value={from}
         onChange={(e) => setFrom(e.target.value)}
       />
       <span>–</span>
       <input
-        aria-label="To date"
+        aria-label={t("To date")}
         type="date"
         value={to}
         min={from}

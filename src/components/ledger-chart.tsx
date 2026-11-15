@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import type { ActivityPoint } from "../lib/reporting";
 import {
   BarChart,
@@ -57,14 +58,14 @@ export default function LedgerChart({
           />
           <Bar
             dataKey={cash ? "CashIn" : "Contributions"}
-            name={cash ? "Cash received" : "Fee payments (cash)"}
+            name={cash ? t("Cash received") : t("Fee payments (cash)")}
             fill="#43a894"
             radius={[4, 4, 0, 0]}
             maxBarSize={22}
           />
           <Bar
             dataKey={cash ? "CashOut" : "Expenses"}
-            name={cash ? "Cash spent / repaid" : "Expenses"}
+            name={cash ? t("Cash spent / repaid") : t("Expenses")}
             fill="#efb88c"
             radius={[4, 4, 0, 0]}
             maxBarSize={22}

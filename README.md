@@ -20,7 +20,9 @@ Set up the administrator account for `khalids8774@gmail.com`, confirm the email,
 
 In **Settings → Club administration**, enable or disable signup, approve accounts into the club, edit names, remove membership, or ban and unban users. New accounts have no ledger access until approved. Approved members can view the shared ledger; only the administrator can edit it. Signups start disabled.
 
-The dashboard separates cash in hand, unpaid member fees, money the club must repay, and total spending. Tap a balance to see its records. Member statements explain fee payments, items provided, and loans separately. The cash graph opens on the last **two weeks**.
+The dashboard separates cash in hand, unpaid member fees, money the club must repay, and total spending. Tap a balance to see its records. Member totals appear directly on the dashboard. Open a member to see individual payments, cash given, personal spending, unpaid fees, and money owed back. The cash graph opens on the last **two weeks**.
+
+Choose **English** or **বাংলা** from the language selector; your preference is saved. Link your own member profile in **Settings → My member profile**.
 
 The app checks for updates on startup. Check manually in **Settings → Application updates**. Appearance settings offer **Light**, **Dark**, and **System** modes.
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   cashMovement,
+  isOriginalDateUnknown,
   memberCashPaid,
   transactionDateLabel,
 } from "./presentation";
@@ -43,6 +44,13 @@ describe("plain-language money presentation", () => {
       notes:
         "Opening ledger import 2026-11-15. Original payment/purchase date unknown; import date used.",
     });
+    expect(isOriginalDateUnknown(imported)).toBe(true);
+    expect(
+      isOriginalDateUnknown({
+        ...imported,
+        transaction_date: "2026-11-10T12:00:00+06:00",
+      }),
+    ).toBe(false);
     expect(transactionDateLabel(imported)).toContain("Original date unknown");
     expect(
       transactionDateLabel({

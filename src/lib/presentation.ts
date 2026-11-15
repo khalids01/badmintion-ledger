@@ -1,3 +1,4 @@
+import { t as translate } from "./i18n";
 import { day, minor } from "./accounting";
 import type { Ledger, Transaction } from "./types";
 
@@ -26,14 +27,14 @@ export function memberCashPaid(data: Ledger, memberId: string) {
     .cashIn;
 }
 export function transactionLabel(t: Transaction) {
-  if (t.type === "contribution") return "Fee payment";
-  if (t.type === "loan_received") return "Member lent money";
-  if (t.type === "loan_repayment") return "Club repaid member";
+  if (t.type === "contribution") return translate("Fee payment");
+  if (t.type === "loan_received") return translate("Member lent money");
+  if (t.type === "loan_repayment") return translate("Club repaid member");
   return t.funding_source === "member_personal"
-    ? "Member-funded expense"
-    : "Cash expense";
+    ? translate("Member-funded expense")
+    : translate("Cash expense");
 }
-export function transactionDateLabel(t: Transaction) {
+export function isOriginalDateUnknown(t: Transaction) {
   const imported = t.notes?.match(/Opening ledger import (\d{4}-\d{2}-\d{2})/);
   const localDate = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dhaka",
@@ -41,9 +42,16 @@ export function transactionDateLabel(t: Transaction) {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(t.transaction_date));
-  return imported &&
+  return (
+    !!imported &&
     /date unknown/i.test(t.notes || "") &&
     localDate === imported[1]
-    ? `Original date unknown · imported ${day(t.transaction_date)}`
+  );
+}
+export function transactionDateLabel(t: Transaction) {
+  return isOriginalDateUnknown(t)
+    ? translate("Original date unknown · imported {date}", {
+        date: day(t.transaction_date),
+      })
     : day(t.transaction_date);
 }

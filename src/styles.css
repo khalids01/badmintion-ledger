@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
 @import "tailwindcss";
 :root {
   font-family: "DM Sans", sans-serif;
@@ -2697,4 +2697,207 @@ em {
   .quick-actions > button {
     min-width: 0;
   }
+}
+
+/* Keep payments prominent and explanations available on demand. */
+.language-control {
+  display: grid;
+  gap: 8px;
+}
+.language-control.compact {
+  display: block;
+}
+.language-control.compact select {
+  width: auto;
+  max-width: 110px;
+  padding: 7px 24px 7px 10px;
+  min-height: 36px;
+}
+:root:lang(bn) {
+  font-family: "Noto Sans Bengali", "DM Sans", sans-serif;
+}
+:lang(bn) h1,
+:lang(bn) h2,
+:lang(bn) h3 {
+  font-family: inherit;
+  line-height: 1.5;
+}
+.member-name {
+  display: block;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+.member-name:hover h3 {
+  color: var(--text-217c65, #217c65);
+}
+.member-total {
+  display: grid;
+  text-align: left;
+  gap: 4px;
+  width: 100%;
+  margin: 18px 0 4px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-f7f8fa, #f7f8fa);
+}
+.member-total span {
+  color: var(--text-777c86, #777c86);
+  font-size: 12px;
+}
+.member-total strong {
+  font-size: 28px;
+  letter-spacing: -0.8px;
+}
+.statement-total {
+  display: grid;
+  gap: 4px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-f7f8fa, #f7f8fa);
+}
+.statement-total > strong {
+  font-size: 40px;
+  line-height: 1.2;
+  letter-spacing: -1.2px;
+}
+.statement-total > small,
+.statement-total > span {
+  color: var(--text-777c86, #777c86);
+}
+.payment-equation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+.payment-equation b {
+  color: var(--text-777c86, #777c86);
+  font-weight: 400;
+}
+.statement-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.statement-split > div {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line-e2e5e9, #e2e5e9);
+  border-radius: 12px;
+}
+.statement-split span {
+  color: var(--text-777c86, #777c86);
+  font-size: 12px;
+}
+.statement-split strong {
+  font-size: 22px;
+}
+.fee-details summary,
+.form-guide summary {
+  cursor: pointer;
+  color: var(--text-777c86, #777c86);
+  padding-block: 6px;
+}
+.form-guide p {
+  margin-top: 8px;
+  line-height: 1.6;
+  color: var(--text-777c86, #777c86);
+}
+.payment-row {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-e2e5e9, #e2e5e9);
+  text-align: left;
+}
+.payment-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.payment-row > strong {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.payment-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-777c86, #777c86);
+  font-size: 12px;
+}
+.payment-row:hover {
+  background: var(--bg-f7f8fa, #f7f8fa);
+}
+.member-statement .statement-history-title {
+  margin: 4px 0 -12px;
+}
+.balance-cards .stat-footer {
+  min-height: 24px;
+}
+@media (max-width: 600px) {
+  .top-right {
+    gap: 6px;
+  }
+  .statement-total {
+    padding: 18px;
+  }
+  .statement-total > strong {
+    font-size: 34px;
+  }
+  .statement-split > div {
+    padding: 12px;
+  }
+  .statement-split strong {
+    font-size: 21px;
+  }
+  :lang(bn) .mobile-nav span {
+    font-size: 10px;
+  }
+  :lang(bn) .heading-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.member-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  text-align: left;
+  border-top: 1px solid var(--line-e2e5e9, #e2e5e9);
+}
+.member-payment-row > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.member-payment-row small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-777c86, #777c86);
+}
+.member-payment-row > strong {
+  white-space: nowrap;
+}
+.member-payment-row:hover {
+  background: var(--bg-f7f8fa, #f7f8fa);
+}
+@media (max-width: 600px) {
+  .member-payment-row {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+}
+
+.modal-heading h2 {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

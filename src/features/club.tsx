@@ -1,3 +1,5 @@
+import { LanguageControl } from "./language";
+import { t, t as translate } from "../lib/i18n";
 import { lazy, Suspense, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
@@ -8,6 +10,7 @@ import { labels } from "../lib/labels";
 import { MemberStatement } from "../components/member-statement";
 import {
   cashMovement,
+  memberCashPaid,
   transactionLabel,
   transactionDateLabel,
 } from "../lib/presentation";
@@ -64,25 +67,30 @@ export function AccessScreen({
         <img className="brand-icon" src="/brand.svg" alt="" />
         <h1>
           {status === "banned"
-            ? "Access suspended"
+            ? t("Access suspended")
             : status === "pending"
-              ? "Waiting for approval"
-              : "Checking club access…"}
+              ? t("Waiting for approval")
+              : t("Checking club access…")}
         </h1>
         <p>
           {status === "banned"
-            ? "Your account is banned. Contact the club administrator to restore access."
+            ? t(
+                "Your account is banned. Contact the club administrator to restore access.",
+              )
             : status === "pending"
-              ? "Your account is ready. The administrator must approve you before you can view the club."
-              : "We need a connection to verify your membership."}
+              ? t(
+                  "Your account is ready. The administrator must approve you before you can view the club.",
+                )
+              : t("We need a connection to verify your membership.")}
         </p>
         <div className="form">
           <button className="button secondary" onClick={retry}>
-            Check again
+            {t("Check again")}
           </button>
           <button className="button secondary" onClick={logout}>
-            Sign out
+            {t("Sign out")}
           </button>
+          <LanguageControl />
           <ThemeControl />
           <UpdateControl />
         </div>
@@ -131,21 +139,22 @@ export function AdminSettings() {
   return (
     <section className="panel admin-settings">
       <div className="panel-heading">
-        <h2>Club administration</h2>
+        <h2>{t("Club administration")}</h2>
         <p>
-          Approve members before they can view this club. Only you can edit the
-          ledger.
+          {t(
+            "Approve members before they can view this club. Only you can edit the ledger.",
+          )}
         </p>
       </div>
       <div className="settings-body">
         {(error || query.error) && (
           <div className="error-banner" role="alert">
             {error || query.error?.message}
-            <button onClick={() => void query.refetch()}>Retry</button>
+            <button onClick={() => void query.refetch()}>{t("Retry")}</button>
           </div>
         )}
         {query.isPending ? (
-          <p>Loading accounts…</p>
+          <p>{t("Loading accounts…")}</p>
         ) : (
           query.data && (
             <>
@@ -159,18 +168,22 @@ export function AdminSettings() {
                     void manage("signup", undefined, String(e.target.checked))
                   }
                 />
-                Allow new signups
+                {t("Allow new signups")}
               </label>
               <p className="form-hint">
                 {query.data.signup_enabled
-                  ? "Anyone can register, but every new account needs your approval."
-                  : "Registration is closed. Existing members can still sign in."}
+                  ? t(
+                      "Anyone can register, but every new account needs your approval.",
+                    )
+                  : t(
+                      "Registration is closed. Existing members can still sign in.",
+                    )}
               </p>
               <label>
-                Find an account
+                {t("Find an account")}
                 <input
                   type="search"
-                  placeholder="Search name or email"
+                  placeholder={t("Search name or email")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -189,22 +202,25 @@ export function AdminSettings() {
                         <span className="club-email">{u.email}</span>
                         <span className="badge">
                           {u.is_admin
-                            ? "Administrator"
+                            ? t("Administrator")
                             : u.banned
-                              ? "Banned"
+                              ? t("Banned")
                               : u.approved
-                                ? "Club member"
-                                : "Pending approval"}
+                                ? t("Club member")
+                                : t("Pending approval")}
                         </span>
                         <small>
-                          Joined {day(u.created_at)} ·{" "}
+                          {t("Joined")}
+                          {day(u.created_at)} ·{" "}
                           {u.confirmed
-                            ? "Email confirmed"
-                            : "Email unconfirmed"}
+                            ? t("Email confirmed")
+                            : t("Email unconfirmed")}
                         </small>
                         <small>
-                          Last sign-in:{" "}
-                          {u.last_sign_in_at ? day(u.last_sign_in_at) : "Never"}
+                          {t("Last sign-in:")}{" "}
+                          {u.last_sign_in_at
+                            ? day(u.last_sign_in_at)
+                            : t("Never")}
                         </small>
                       </div>
                       {editing === u.id ? (
@@ -216,7 +232,7 @@ export function AdminSettings() {
                           }}
                         >
                           <label>
-                            Display name
+                            {t("Display name")}
                             <input
                               required
                               maxLength={100}
@@ -229,14 +245,14 @@ export function AdminSettings() {
                               className="button secondary"
                               disabled={busy}
                             >
-                              Save name
+                              {t("Save name")}
                             </button>
                             <button
                               type="button"
                               className="text-button"
                               onClick={() => setEditing(null)}
                             >
-                              Cancel
+                              {t("Cancel")}
                             </button>
                           </div>
                         </form>
@@ -250,7 +266,7 @@ export function AdminSettings() {
                               setName(u.name);
                             }}
                           >
-                            Edit name
+                            {t("Edit name")}
                           </button>
                           {!u.is_admin && (
                             <>
@@ -266,8 +282,8 @@ export function AdminSettings() {
                                   }
                                 >
                                   {u.approved
-                                    ? "Remove from club"
-                                    : "Approve into club"}
+                                    ? t("Remove from club")
+                                    : t("Approve into club")}
                                 </button>
                               )}
                               <button
@@ -277,7 +293,7 @@ export function AdminSettings() {
                                   void manage(u.banned ? "unban" : "ban", u.id)
                                 }
                               >
-                                {u.banned ? "Unban" : "Ban"}
+                                {u.banned ? t("Unban") : t("Ban")}
                               </button>
                             </>
                           )}
@@ -289,12 +305,12 @@ export function AdminSettings() {
                   `${u.name} ${u.email}`
                     .toLowerCase()
                     .includes(search.toLowerCase()),
-                ) && <p>No matching accounts.</p>}
+                ) && <p>{t("No matching accounts.")}</p>}
               </div>
               <p className="form-hint">
-                Removing membership returns an account to pending. A ban blocks
-                club access immediately, including existing sessions. Unbanning
-                restores its previous membership.
+                {t(
+                  "Removing membership returns an account to pending. A ban blocks club access immediately, including existing sessions. Unbanning restores its previous membership.",
+                )}
               </p>
             </>
           )
@@ -318,24 +334,26 @@ export function ClubViewer({
       <header className="club-viewer-header">
         <img className="brand-icon" src="/brand.svg" alt="" />
         <strong>Badminton Ledger</strong>
+        <LanguageControl compact />
         <ThemeControl compact />
         <button className="button secondary" onClick={logout}>
-          Sign out
+          {t("Sign out")}
         </button>
       </header>
       <main>
         <div className="page-heading">
           <div>
-            <div className="eyebrow">CLUB MEMBER</div>
-            <h1>Your club’s ledger</h1>
-            <p>You have view access. The administrator manages records.</p>
+            <div className="eyebrow">{t("CLUB MEMBER")}</div>
+            <h1>{t("Your club’s ledger")}</h1>
+            <p>
+              {t("You have view access. The administrator manages records.")}
+            </p>
           </div>
         </div>
         <div className="stats-grid">
           <section className="panel settings-body">
-            <span>Cash in hand</span>
+            <span>{t("Cash in hand")}</span>
             <h2>{money(totals.funds)}</h2>
-            <p>Money the club can spend now</p>
           </section>
           {[
             ["Members still owe", totals.outstanding],
@@ -343,58 +361,55 @@ export function ClubViewer({
             ["Total spent", totals.expenses],
           ].map(([label, value]) => (
             <section className="panel settings-body" key={label}>
-              <span>{label}</span>
+              <span>{t(String(label))}</span>
               <h2>{money(Number(value))}</h2>
             </section>
           ))}
         </div>
-        <div className="balance-explainer">
-          Unpaid fees are money members owe the club. Loans are money the club
-          must return to members.
-        </div>
+
         <section className="panel settings-body">
-          <h2>Cash in, cash out</h2>
+          <h2>{t("Cash in, cash out")}</h2>
           <label>
-            Chart weeks
+            {t("Chart weeks")}
             <select
               value={weeks}
               onChange={(e) => setWeeks(Number(e.target.value))}
             >
               {[2, 4, 8, 12].map((n) => (
                 <option key={n} value={n}>
-                  Last {n} weeks
+                  {t("Last {count} weeks", { count: n })}
                 </option>
               ))}
             </select>
           </label>
-          <p>
-            Weekly cash received (fees + loans) and cash spent / repaid. Items
-            provided by members do not move cash.
-          </p>
-          <Suspense fallback={<p>Loading chart…</p>}>
+
+          <Suspense fallback={<p>{t("Loading chart…")}</p>}>
             <ViewerChart data={weeklyActivity(data, weeks)} cash />
           </Suspense>
         </section>
         <section className="panel settings-body">
-          <h2>Where the money went</h2>
+          <h2>{t("Where the money went")}</h2>
           <p>
-            {money(cash.cashExpenses)} paid from club cash +{" "}
-            {money(cash.memberPurchases)} in member-funded purchases.
+            {t("Club cash")}: {money(cash.cashExpenses)} ·{" "}
+            {t("Spent personally")}: {money(cash.memberPurchases)}
           </p>
           <p>
-            Cash received: {money(cash.cashIn)} · Cash spent / repaid:{" "}
-            {money(cash.cashOut)} · Cash left: {money(totals.funds)}
+            {t("Cash received:")}
+            {money(cash.cashIn)} {t("· Cash spent / repaid:")}{" "}
+            {money(cash.cashOut)} {t("· Cash left:")} {money(totals.funds)}
           </p>
         </section>
         <section className="panel">
           <div className="settings-body">
-            <h2>Transactions</h2>
+            <h2>{t("Transactions")}</h2>
             {data.transactions
               .filter((t) => !t.voided_at)
               .map((t) => (
                 <div className="club-transaction" key={t.id}>
                   <div>
-                    <strong>{t.description || labels[t.type]}</strong>
+                    <strong>
+                      {t.description || translate(labels[t.type])}
+                    </strong>
                     <small>
                       {transactionLabel(t)} · {transactionDateLabel(t)}
                     </small>
@@ -411,12 +426,12 @@ export function ClubViewer({
                 </div>
               ))}
             {!data.transactions.some((t) => !t.voided_at) && (
-              <p>No transactions yet.</p>
+              <p>{t("No transactions yet.")}</p>
             )}
           </div>
         </section>
         <section className="panel settings-body">
-          <h2>Club members</h2>
+          <h2>{t("Club members")}</h2>
           {data.members
             .filter((m) => m.is_active)
             .map((m) => (
@@ -424,8 +439,12 @@ export function ClubViewer({
                 <summary>
                   <strong>{m.name}</strong>
                   <span>
-                    {money(totals.members[m.id]?.outstanding || 0)} still due ·
-                    View statement
+                    {t("Total paid")}:{" "}
+                    {money(
+                      totals.members[m.id].purchases +
+                        memberCashPaid(data, m.id),
+                    )}{" "}
+                    · {t("View payments")}
                   </span>
                 </summary>
                 <MemberStatement data={data} member={m} />
