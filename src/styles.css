@@ -1174,6 +1174,14 @@ button.tx-row:hover {
 .member-due strong {
   font-size: 13px;
 }
+.member-due .member-paid {
+  color: var(--teal-strong);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.member-due small {
+  font-size: 11px;
+}
 
 .mini-stats {
   display: grid;

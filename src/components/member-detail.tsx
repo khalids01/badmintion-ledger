@@ -1,7 +1,7 @@
 import { ScreenshotButton } from "./screenshot-button";
 import { t } from "../lib/i18n";
 import { calculate, money } from "../lib/accounting";
-import { memberCashPaid, isTemporaryMember } from "../lib/presentation";
+import { isTemporaryMember } from "../lib/presentation";
 import { Avatar, MemberBadge } from "./ui-kit";
 import { MemberStatement } from "./member-statement";
 import { HandCoins, Pencil, CreditCard } from "lucide-react";
@@ -24,7 +24,6 @@ export function MemberDetail({
 }) {
   const totals = calculate(data);
   const balance = totals.members[member.id];
-  const cash = memberCashPaid(data, member.id);
 
   return (
     <div className="member-statement">
@@ -61,6 +60,12 @@ export function MemberDetail({
         )}
       </div>
 
+      <MemberStatement
+        data={data}
+        member={member}
+        onTransaction={onTransaction}
+      />
+
       {onRecordPayment && (
         <button
           className="button primary"
@@ -71,23 +76,6 @@ export function MemberDetail({
           {t("Record payment for {name}", { name: member.name })}
         </button>
       )}
-
-      <div className="detail-stats">
-        <div>
-          <small>{t("Total fees charged")}</small>
-          <strong>{money(balance.assigned)}</strong>
-        </div>
-        <div>
-          <small>{t("Total payments")}</small>
-          <strong>{money(cash + balance.purchases)}</strong>
-        </div>
-        <div>
-          <small>{t("Remaining dues")}</small>
-          <strong className={balance.outstanding ? "orange" : undefined}>
-            {money(balance.outstanding)}
-          </strong>
-        </div>
-      </div>
 
       {balance.loans > 0 && (
         <div
@@ -104,11 +92,7 @@ export function MemberDetail({
         </div>
       )}
 
-      <MemberStatement
-        data={data}
-        member={member}
-        onTransaction={onTransaction}
-      />
+
     </div>
   );
 }

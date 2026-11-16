@@ -4,7 +4,7 @@ import { Avatar, PanelTitle, Empty, MemberBadge } from "../components/ui-kit";
 import type { LedgerWorkspace } from "./use-ledger";
 import type { Member } from "../lib/types";
 import { Search, ChevronRight, Plus } from "lucide-react";
-import { isTemporaryMember } from "../lib/presentation";
+import { isTemporaryMember, memberCashPaid } from "../lib/presentation";
 
 export function MembersPage({
   workspace,
@@ -210,14 +210,13 @@ export function MembersPage({
                 <small>{m.phone || t("Club member")}</small>
               </span>
               <span className="member-due">
-                <MemberBadge
-                  outstanding={b.outstanding}
-                  assigned={b.assigned}
-                  credit={b.credit}
-                />
-                <strong className={b.outstanding ? "orange" : undefined}>
-                  {b.outstanding ? money(b.outstanding) : money(0)}
+                <small>{t("Total paid")}</small>
+                <strong className="member-paid">
+                  {money(memberCashPaid(data, m.id) + b.purchases)}
                 </strong>
+                <small className={b.outstanding ? "orange" : undefined}>
+                  {t("Still due")}: {money(b.outstanding)}
+                </small>
               </span>
               <ChevronRight size={16} className="muted" />
             </button>
