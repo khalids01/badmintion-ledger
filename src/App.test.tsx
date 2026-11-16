@@ -90,13 +90,25 @@ async function mount() {
       <App />
     </QueryClientProvider>,
   );
-  await screen.findByText("Cash in hand");
+  await screen.findAllByText("Cash in hand");
   return result;
 }
 afterEach(() => {
   cleanup();
   setLanguage("en");
+  localStorage.clear();
 });
+async function openAdd(u: ReturnType<typeof userEvent.setup>) {
+  await u.click(screen.getAllByRole("button", { name: "Add" })[0]);
+}
+async function openAddOnSheet(
+  u: ReturnType<typeof userEvent.setup>,
+  name: RegExp | string,
+) {
+  await openAdd(u);
+  const dialog = screen.getByRole("dialog");
+  await u.click(within(dialog).getByRole("button", { name }));
+}
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   store.data = structuredClone(demo);
@@ -113,15 +125,18 @@ describe("ledger workflows", () => {
     expect(screen.getByText("Cash in hand")).toBeTruthy();
     expect(screen.getByText("৳7,400")).toBeTruthy();
   });
-  it("shows weekly periods and app branding on the home screen", async () => {
+  it("shows the cash hero and app branding on the home screen", async () => {
     const u = userEvent.setup();
     await mount();
+    expect(screen.getByText("Cash in hand")).toBeTruthy();
+    expect(screen.getByText(/Actual cash available/)).toBeTruthy();
+    await u.click(screen.getAllByText("Reports", { exact: true })[0]);
     expect(screen.getByText(/Weekly cash received and spent/)).toBeTruthy();
     const selector = screen.getByLabelText("Chart weeks") as HTMLSelectElement;
     expect(selector.value).toBe("2");
     await u.selectOptions(selector, "4");
     expect(selector.value).toBe("4");
-    expect(screen.getByAltText("Badminton Ledger")).toBeTruthy();
+    expect(screen.getByText("Monthly income versus expenses")).toBeTruthy();
   });
   it("creates and edits a member", async () => {
     const u = userEvent.setup();
@@ -131,7 +146,7 @@ describe("ledger workflows", () => {
     const dialog = screen.getByRole("dialog");
     await u.type(within(dialog).getByLabelText("Full name"), "Test Player");
     await u.click(within(dialog).getByText("Save member"));
-    expect(screen.getByText("Test Player")).toBeTruthy();
+    await u.click(screen.getByRole("button", { name: /Test Player/ }));
     await u.click(screen.getByLabelText("Edit Test Player"));
     await u.clear(screen.getByLabelText("Full name"));
     await u.type(screen.getByLabelText("Full name"), "Updated Player");
@@ -141,7 +156,7 @@ describe("ledger workflows", () => {
   it("saves a contribution and updates funds", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Someone paid money"));
+    await openAddOnSheet(u, /^Collect money/);
     await u.type(screen.getByLabelText("Amount (BDT)"), "500");
     await u.selectOptions(screen.getByLabelText("Member"), "m0");
     await u.type(screen.getByLabelText("Description"), "Test contribution");
@@ -153,7 +168,7 @@ describe("ledger workflows", () => {
   it("assigns custom dues to a selected member", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Assign dues", { exact: true }));
+    await openAddOnSheet(u, /^Assign dues/);
     await u.type(screen.getByLabelText("Default amount (BDT)"), "500");
     await u.click(screen.getByLabelText("Select all active members"));
     await u.click(screen.getByLabelText("Fahim Rahman"));
@@ -167,7 +182,11 @@ describe("ledger workflows", () => {
   it("prevents excessive loan repayment", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Repay a member"));
+    await openAddOnSheet(u, /^Borrow or repay/);
+    const dialog = screen.getByRole("dialog");
+    await u.click(
+      within(dialog).getByRole("button", { name: /^The club repaid someone/ }),
+    );
     await u.selectOptions(screen.getByLabelText("Lender"), "m0");
     await u.type(screen.getByLabelText("Amount (BDT)"), "2500");
     await u.click(screen.getByText("Save transaction"));
@@ -182,7 +201,7 @@ describe("ledger workflows", () => {
     await u.click(screen.getByText("Void transaction"));
     await u.type(screen.getByLabelText("Reason"), "Duplicate court entry");
     await u.click(screen.getByText("Confirm void transaction"));
-    await u.click(screen.getAllByText("Dashboard", { exact: true })[0]);
+    await u.click(screen.getAllByText("Home", { exact: true })[0]);
     expect(screen.getByText("৳9,800")).toBeTruthy();
   });
   it("exports transactions through a CSV download", async () => {
@@ -227,14 +246,25 @@ describe("club access gates", () => {
       expect(store.reads).toBe(0);
     });
   }
-  it("gives approved members a view without editing or administration controls", async () => {
+  it("gives approved members a view-only layout with the four tabs and no admin controls", async () => {
     store.admin = false;
     await mount();
-    expect(screen.getByText("Your club’s ledger")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "Add transaction" }),
-    ).toBeNull();
+    for (const tab of ["Home", "Members", "Transactions", "Reports"])
+      expect(screen.getAllByText(tab, { exact: true }).length).toBeGreaterThan(
+        0,
+      );
+    expect(screen.getByText("Read-only")).toBeTruthy();
+    expect(screen.queryByText("My balance")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Add$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add member" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Collect money" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add expense" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Assign dues/ })).toBeNull();
     expect(screen.queryByText("Club administration")).toBeNull();
+    expect(screen.queryByLabelText("Edit member")).toBeNull();
+    expect(screen.queryByText("My member profile")).toBeNull();
+    expect(screen.queryByText("Expense categories")).toBeNull();
+    expect(screen.queryByText("Export all transactions")).toBeNull();
   });
 });
 
@@ -259,7 +289,7 @@ it("hides cached ledger data when an existing session becomes banned", async () 
 });
 
 describe("balance explanations", () => {
-  it("opens a cash breakdown and the members the club owes", async () => {
+  it("shows the cash breakdown and the members the club owes", async () => {
     const u = userEvent.setup();
     await mount();
     await u.click(screen.getByRole("button", { name: /Cash in hand/ }));
@@ -268,17 +298,14 @@ describe("balance explanations", () => {
     await u.click(screen.getByRole("button", { name: /Club must repay/ }));
     expect(await screen.findByText("Who must the club repay?")).toBeTruthy();
   });
-  it("starts with a choice and opens the member-funded purchase form", async () => {
+  it("opens the member-funded purchase form from Add expense", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByRole("button", { name: "Add transaction" }));
-    const dialog = screen.getByRole("dialog");
-    await u.click(
-      within(dialog).getByRole("button", { name: /Someone provided items/ }),
+    await openAddOnSheet(u, /^Add expense/);
+    await u.selectOptions(
+      screen.getByLabelText("Who paid?"),
+      "member_personal",
     );
-    expect(
-      (screen.getByLabelText("Who paid?") as HTMLSelectElement).value,
-    ).toBe("member_personal");
     expect(
       screen.getByLabelText("Should this count as their payment or a loan?"),
     ).toBeTruthy();
@@ -286,19 +313,30 @@ describe("balance explanations", () => {
 });
 
 describe("member payment clarity and preferences", () => {
-  it("opens any member directly from the dashboard and shows cash plus personal spending", async () => {
+  it("opens a member from the home outstanding list and shows the payment action", async () => {
     const u = userEvent.setup();
     await mount();
     await u.click(
-      screen.getByRole("button", { name: /Shawon Ahmed.*Total paid/ }),
+      screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            /Fahim Rahman/.test(b.textContent || "") &&
+            /৳/.test(b.textContent || ""),
+        )!,
     );
     const dialog = screen.getByRole("dialog");
     expect(
       within(dialog).getByText("Total paid").closest("div")?.textContent,
-    ).toContain("৳4,600");
+    ).toContain("৳1,500");
     expect(
       within(dialog).getByText("Cash given").closest("div")?.textContent,
-    ).toContain("৳4,000");
+    ).toContain("৳1,500");
+    expect(
+      within(dialog).getByRole("button", {
+        name: /Record payment for Fahim Rahman/,
+      }),
+    ).toBeTruthy();
   });
   it("moves profile selection into settings without changing administrator access", async () => {
     const u = userEvent.setup();
@@ -307,7 +345,7 @@ describe("member payment clarity and preferences", () => {
     await u.click(screen.getByText("Add member"));
     expect(screen.queryByLabelText(/This is me/)).toBeNull();
     await u.click(screen.getByLabelText("Close"));
-    await u.click(screen.getAllByText("Settings", { exact: true })[0]);
+    await u.click(screen.getByLabelText("Settings"));
     await u.selectOptions(screen.getByLabelText("My member profile"), "m1");
     expect(store.data!.members.find((m) => m.id === "m0")!.is_me).toBe(false);
     expect(store.data!.members.find((m) => m.id === "m1")!.is_me).toBe(true);
@@ -318,7 +356,7 @@ describe("member payment clarity and preferences", () => {
   it("switches to Bangla, preserves an open form and saves the language preference", async () => {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Someone paid money"));
+    await openAddOnSheet(u, /^Collect money/);
     await u.type(screen.getByLabelText("Amount (BDT)"), "390");
     await u.selectOptions(
       within(screen.getByRole("dialog")).getByLabelText("Language"),
@@ -335,7 +373,9 @@ describe("member payment clarity and preferences", () => {
     expect(screen.getByText("সক্রিয় সদস্য")).toBeTruthy();
     expect(screen.getAllByText("Shawon Ahmed").length).toBeGreaterThan(0);
     await u.selectOptions(screen.getByLabelText("ভাষা"), "en");
-    expect(screen.getByText("Active members")).toBeTruthy();
+    expect(
+      screen.getAllByText("Members", { exact: true }).length,
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -343,7 +383,7 @@ describe("linked payment persistence", () => {
   async function fill() {
     const u = userEvent.setup();
     await mount();
-    await u.click(screen.getByText("Someone paid money"));
+    await openAddOnSheet(u, /^Collect money/);
     await u.selectOptions(screen.getByLabelText("Member"), "m2");
     await u.type(screen.getByLabelText("Amount (BDT)"), "500");
     await u.click(screen.getByLabelText("Use this payment to repay a loan"));
@@ -378,5 +418,67 @@ describe("linked payment persistence", () => {
     store.insertError = false;
     await u.click(screen.getByText("Save transaction"));
     expect(store.batches[1]).toEqual(store.batches[0]);
+  });
+});
+
+describe("member navigation and read-only permissions", () => {
+  it("navigates from Members list to a dedicated detail screen with payment preselected", async () => {
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getAllByText("Members", { exact: true })[0]);
+    await u.click(
+      screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            (b.textContent || "").includes("Fahim Rahman") &&
+            b.classList.contains("member-row"),
+        )!,
+    );
+    const dialog = screen.getByRole("dialog");
+    await u.click(
+      within(dialog).getByRole("button", {
+        name: /Record payment for Fahim Rahman/,
+      }),
+    );
+    const form = screen.getByRole("dialog");
+    expect(
+      (within(form).getByLabelText("Member") as HTMLSelectElement).value,
+    ).toBe("m2");
+    expect(
+      within(form).getByRole("heading", { name: "Fee payment" }),
+    ).toBeTruthy();
+  });
+  it("read-only members see member details but no edit, payment or void actions", async () => {
+    store.admin = false;
+    const u = userEvent.setup();
+    await mount();
+    await u.click(screen.getAllByText("Members", { exact: true })[0]);
+    await u.click(screen.getAllByText("Home", { exact: true })[0]);
+    await u.click(screen.getAllByText("Members", { exact: true })[0]);
+    await u.click(
+      screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            /Shawon Ahmed/.test(b.textContent || "") &&
+            (b.textContent || "").includes("Club member"),
+        )!,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).queryByRole("button", { name: /Record payment/ }),
+    ).toBeNull();
+    expect(within(dialog).queryByLabelText(/Edit /)).toBeNull();
+    await u.click(screen.getByLabelText("Close"));
+    await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
+    await u.click(screen.getByText("Evening court booking"));
+    const txDetail = screen.getByRole("dialog");
+    expect(
+      within(txDetail).queryByRole("button", { name: "Void transaction" }),
+    ).toBeNull();
+    expect(
+      within(txDetail).getByText(/Only the administrator can edit or void/),
+    ).toBeTruthy();
   });
 });

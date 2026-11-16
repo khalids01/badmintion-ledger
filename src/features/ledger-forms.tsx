@@ -81,6 +81,7 @@ export function TransactionForm({
   type,
   record,
   initialPersonal = false,
+  initialMemberId,
   busy,
   onSave,
   onVoid,
@@ -90,6 +91,7 @@ export function TransactionForm({
   type: Kind;
   record?: Transaction;
   initialPersonal?: boolean;
+  initialMemberId?: string;
   busy: boolean;
   onSave: (v: Record<string, unknown> | Record<string, unknown>[]) => void;
   onVoid: () => void;
@@ -115,7 +117,8 @@ export function TransactionForm({
             day: "2-digit",
           }).format(new Date(record.transaction_date))
         : today(),
-      member_id: record?.member_id || record?.paid_by_member_id || "",
+      member_id:
+        record?.member_id || record?.paid_by_member_id || initialMemberId || "",
       category_id:
         record?.category_id ||
         data.expense_categories.filter((c) => c.is_active)[0]?.id ||
@@ -391,17 +394,7 @@ export function TransactionForm({
             )}
           </p>
         </>
-      ) : (
-        <label>
-          {t("Payment method")}
-          <select {...register("payment_method")}>
-            <option value="cash">{t("Cash")}</option>
-            <option value="bank_transfer">{t("Bank transfer")}</option>
-            <option value="mobile_wallet">{t("Mobile wallet")}</option>
-            <option value="other">{t("Other")}</option>
-          </select>
-        </label>
-      )}
+      ) : null}
       {!record && kind === "contribution" && summary.loans > 0 && (
         <div className="repayment-choice">
           <label className="checkbox">
@@ -445,20 +438,34 @@ export function TransactionForm({
           )}
         </div>
       )}
-      <label>
-        {t("Description")}
-        <input
-          placeholder={t("What was this for?")}
-          {...register("description")}
-        />
-      </label>
-      <label>
-        {t("Notes (optional)")}
-        <textarea
-          {...register("notes")}
-          placeholder={t("Any extra details…")}
-        />
-      </label>
+      <details className="form-guide advanced-fields">
+        <summary>{t("Advanced details")}</summary>
+        {!personal && (
+          <label>
+            {t("Payment method")}
+            <select {...register("payment_method")}>
+              <option value="cash">{t("Cash")}</option>
+              <option value="bank_transfer">{t("Bank transfer")}</option>
+              <option value="mobile_wallet">{t("Mobile wallet")}</option>
+              <option value="other">{t("Other")}</option>
+            </select>
+          </label>
+        )}
+        <label>
+          {t("Description")}
+          <input
+            placeholder={t("What was this for?")}
+            {...register("description")}
+          />
+        </label>
+        <label>
+          {t("Notes (optional)")}
+          <textarea
+            {...register("notes")}
+            placeholder={t("Any extra details…")}
+          />
+        </label>
+      </details>
       {!record?.voided_at && previewAmount > 0 && (
         <div className="live-preview" role="status">
           <strong>{t("After saving this entry")}</strong>

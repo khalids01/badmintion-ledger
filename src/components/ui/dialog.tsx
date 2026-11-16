@@ -17,6 +17,7 @@ export function Modal({
       <Dialog.Portal>
         <Dialog.Overlay className="modal-overlay" />
         <Dialog.Content className="modal">
+          <div className="sheet-grabber" aria-hidden="true" />
           <div className="modal-heading">
             <Dialog.Title>{title}</Dialog.Title>
             <LanguageControl compact />

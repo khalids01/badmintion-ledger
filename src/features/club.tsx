@@ -1,22 +1,11 @@
 import { LanguageControl } from "./language";
-import { t, t as translate } from "../lib/i18n";
-import { lazy, Suspense, useState } from "react";
+import { t } from "../lib/i18n";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { ThemeControl } from "./theme";
 import { UpdateControl } from "./updates";
-import { calculate, day, money, minor } from "../lib/accounting";
-import { labels } from "../lib/labels";
-import { MemberStatement } from "../components/member-statement";
-import {
-  cashMovement,
-  memberCashPaid,
-  transactionLabel,
-  transactionDateLabel,
-} from "../lib/presentation";
-import { weeklyActivity } from "../lib/reporting";
-const ViewerChart = lazy(() => import("../components/ledger-chart"));
-import type { Ledger } from "../lib/types";
+import { day } from "../lib/accounting";
 
 export interface Access {
   status: "active" | "pending" | "banned";
@@ -317,144 +306,5 @@ export function AdminSettings() {
         )}
       </div>
     </section>
-  );
-}
-export function ClubViewer({
-  data,
-  logout,
-}: {
-  data: Ledger;
-  logout: () => void;
-}) {
-  const totals = calculate(data);
-  const cash = cashMovement(data.transactions);
-  const [weeks, setWeeks] = useState(2);
-  return (
-    <div className="club-viewer">
-      <header className="club-viewer-header">
-        <img className="brand-icon" src="/brand.svg" alt="" />
-        <strong>Badminton Ledger</strong>
-        <LanguageControl compact />
-        <ThemeControl compact />
-        <button className="button secondary" onClick={logout}>
-          {t("Sign out")}
-        </button>
-      </header>
-      <main>
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">{t("CLUB MEMBER")}</div>
-            <h1>{t("Your club’s ledger")}</h1>
-            <p>
-              {t("You have view access. The administrator manages records.")}
-            </p>
-          </div>
-        </div>
-        <div className="stats-grid">
-          <section className="panel settings-body">
-            <span>{t("Cash in hand")}</span>
-            <h2>{money(totals.funds)}</h2>
-          </section>
-          {[
-            ["Members still owe", totals.outstanding],
-            ["Club must repay", totals.loans],
-            ["Total spent", totals.expenses],
-          ].map(([label, value]) => (
-            <section className="panel settings-body" key={label}>
-              <span>{t(String(label))}</span>
-              <h2>{money(Number(value))}</h2>
-            </section>
-          ))}
-        </div>
-
-        <section className="panel settings-body">
-          <h2>{t("Cash in, cash out")}</h2>
-          <label>
-            {t("Chart weeks")}
-            <select
-              value={weeks}
-              onChange={(e) => setWeeks(Number(e.target.value))}
-            >
-              {[2, 4, 8, 12].map((n) => (
-                <option key={n} value={n}>
-                  {t("Last {count} weeks", { count: n })}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <Suspense fallback={<p>{t("Loading chart…")}</p>}>
-            <ViewerChart data={weeklyActivity(data, weeks)} cash />
-          </Suspense>
-        </section>
-        <section className="panel settings-body">
-          <h2>{t("Where the money went")}</h2>
-          <p>
-            {t("Club cash")}: {money(cash.cashExpenses)} ·{" "}
-            {t("Spent personally")}: {money(cash.memberPurchases)}
-          </p>
-          <p>
-            {t("Cash received:")}
-            {money(cash.cashIn)} {t("· Cash spent / repaid:")}{" "}
-            {money(cash.cashOut)} {t("· Cash left:")} {money(totals.funds)}
-          </p>
-        </section>
-        <section className="panel">
-          <div className="settings-body">
-            <h2>{t("Transactions")}</h2>
-            {data.transactions
-              .filter((t) => !t.voided_at)
-              .map((t) => (
-                <div className="club-transaction" key={t.id}>
-                  <div>
-                    <strong>
-                      {t.description || translate(labels[t.type])}
-                    </strong>
-                    <small>
-                      {transactionLabel(t)} · {transactionDateLabel(t)}
-                    </small>
-                    <small>
-                      {data.members.find(
-                        (m) => m.id === (t.member_id || t.paid_by_member_id),
-                      )?.name ||
-                        data.expense_categories.find(
-                          (c) => c.id === t.category_id,
-                        )?.name}
-                    </small>
-                  </div>
-                  <strong>{money(minor(t.amount))}</strong>
-                </div>
-              ))}
-            {!data.transactions.some((t) => !t.voided_at) && (
-              <p>{t("No transactions yet.")}</p>
-            )}
-          </div>
-        </section>
-        <section className="panel settings-body">
-          <h2>{t("Club members")}</h2>
-          {data.members
-            .filter((m) => m.is_active)
-            .map((m) => (
-              <details className="viewer-statement" key={m.id}>
-                <summary>
-                  <strong>{m.name}</strong>
-                  <span>
-                    {t("Total paid")}:{" "}
-                    {money(
-                      totals.members[m.id].purchases +
-                        memberCashPaid(data, m.id),
-                    )}{" "}
-                    · {t("View payments")}
-                  </span>
-                </summary>
-                <MemberStatement data={data} member={m} />
-              </details>
-            ))}
-        </section>
-        <section className="panel settings-body">
-          <UpdateControl />
-        </section>
-      </main>
-    </div>
   );
 }

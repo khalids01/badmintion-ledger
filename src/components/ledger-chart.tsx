@@ -26,31 +26,31 @@ export default function LedgerChart({
         >
           <CartesianGrid
             vertical={false}
-            stroke="var(--line-e2e5e9, #eef0f2)"
+            stroke="var(--line)"
             strokeDasharray="3 4"
           />
           <XAxis
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#92949e", fontSize: 11 }}
+            tick={{ fill: "var(--text-faint)", fontSize: 11 }}
             dy={9}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#92949e", fontSize: 10 }}
+            tick={{ fill: "var(--text-faint)", fontSize: 10 }}
             tickFormatter={(v) => (v >= 1000 ? "৳" + v / 1000 + "k" : "৳" + v)}
           />
           <Tooltip
-            cursor={{ fill: "var(--bg-f7f8fa, #f6f7f8)" }}
+            cursor={{ fill: "var(--surface-2)" }}
             contentStyle={{
-              background: "var(--bg-ffffff, #fff)",
-              border: "1px solid var(--line-e2e5e9, #e2e5e9)",
-              color: "var(--text-292d35, #292d35)",
-              borderRadius: 10,
+              background: "var(--surface)",
+              border: "1px solid var(--line-strong)",
+              color: "var(--text)",
+              borderRadius: 12,
             }}
-            labelStyle={{ color: "var(--text-292d35, #292d35)" }}
+            labelStyle={{ color: "var(--text-muted)" }}
             labelFormatter={(label, payload) =>
               payload?.[0]?.payload?.range || label
             }
@@ -59,14 +59,14 @@ export default function LedgerChart({
           <Bar
             dataKey={cash ? "CashIn" : "Contributions"}
             name={cash ? t("Cash received") : t("Fee payments (cash)")}
-            fill="#43a894"
+            fill="#14b8a6"
             radius={[4, 4, 0, 0]}
             maxBarSize={22}
           />
           <Bar
             dataKey={cash ? "CashOut" : "Expenses"}
             name={cash ? t("Cash spent / repaid") : t("Expenses")}
-            fill="#efb88c"
+            fill="#f59e0b"
             radius={[4, 4, 0, 0]}
             maxBarSize={22}
           />
