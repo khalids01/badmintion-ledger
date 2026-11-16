@@ -1,28 +1,12 @@
 import { t } from "../lib/i18n";
 import { money } from "../lib/accounting";
-import { TxList } from "../components/tx-list";
-import { Avatar, PanelTitle, Empty } from "../components/ui-kit";
+import { memberPosition } from "../lib/presentation";
+import { Avatar } from "../components/ui-kit";
 import type { LedgerWorkspace } from "./use-ledger";
-import {
-  Wallet,
-  Users,
-  HandCoins,
-  Receipt,
-  ArrowRight,
-  ChevronRight,
-  ArrowDownLeft,
-  ArrowUpRight,
-} from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 
-export function HomePage({
-  workspace,
-  readOnly,
-  onOpenCash,
-  onOpenLoans,
-  onOpenMember,
-  onRecordPayment,
-  onOpenAddExpense,
-  onOpenTx,
+export function HomePage({ workspace, readOnly, onOpenCash, onOpenLoans,
+  onOpenMember, onRecordPayment, onOpenAddExpense,
 }: {
   workspace: LedgerWorkspace;
   readOnly?: boolean;
@@ -33,216 +17,65 @@ export function HomePage({
   onOpenAddExpense: () => void;
   onOpenTx: (tx: import("../lib/types").Transaction) => void;
 }) {
-  const { data, totals, pending, recent, my } = workspace;
-  const myBalance = my ? totals.members[my.id] : undefined;
-  return (
-    <div className="home-grid">
-      <div className="home-col">
-        {/* Cash hero */}
-        <button
-          className="hero"
-          onClick={onOpenCash}
-          aria-label={t("Cash in hand")}
-        >
-          <small>
-            <Wallet size={14} />
-            {t("Cash in hand")}
-          </small>
-          <div className="hero-value">{money(totals.funds)}</div>
-          <div className="hero-foot">
-            <span>
-              {t("Actual cash available. Not total contributions or dues.")}
-            </span>
-            {!readOnly && <ChevronRight size={17} />}
-          </div>
-        </button>
-
-        {/* Compact dues / expenses cards */}
-        <div className="stat-duo">
-          <button
-            className="stat-tile warn"
-            onClick={() => workspace.go("Members", { memberTab: "dues" })}
-          >
-            <span className="stat-label">
-              <Users size={16} />
-              {t("Members still owe")}
-            </span>
-            <span className="stat-value">{money(totals.outstanding)}</span>
-            <span className="stat-foot">
-              {t("{count} members", { count: pending.length })}
-              <ChevronRight size={13} />
-            </span>
-          </button>
-          <button
-            className="stat-tile"
-            onClick={() => workspace.go("Transactions")}
-          >
-            <span className="stat-label">
-              <Receipt size={16} />
-              {t("Total spent")}
-            </span>
-            <span className="stat-value">{money(totals.expenses)}</span>
-            <span className="stat-foot">
-              {t("All spending")}
-              <ChevronRight size={13} />
-            </span>
-          </button>
-        </div>
-
-        {/* Visible club-debt indication */}
-        {totals.loans > 0 && (
-          <button className="debt-banner" onClick={onOpenLoans}>
-            <HandCoins size={22} />
-            <span>
-              <strong>
-                {t("Club must repay {amount}", { amount: money(totals.loans) })}
-              </strong>
-              <small>
-                {t(
-                  readOnly
-                    ? "Member loans"
-                    : "Borrowed from members. Repay through Add → Borrow or repay.",
-                )}
-              </small>
-            </span>
-            {!readOnly && <ChevronRight size={18} />}
-          </button>
-        )}
-
-        {/* Two admin quick actions */}
-        {!readOnly && (
-          <div className="quick-grid">
-            <button className="quick-action collect" onClick={onRecordPayment}>
-              <span className="qa-icon" aria-hidden="true">
-                <ArrowDownLeft size={20} />
-              </span>
-              <span>
-                {t("Collect money")}
-                <small>{t("Record a member payment")}</small>
-              </span>
-            </button>
-            <button className="quick-action expense" onClick={onOpenAddExpense}>
-              <span className="qa-icon" aria-hidden="true">
-                <ArrowUpRight size={20} />
-              </span>
-              <span>
-                {t("Add expense")}
-                <small>{t("Club bought something")}</small>
-              </span>
-            </button>
-          </div>
-        )}
-
-        {/* Few outstanding members */}
-        <section className="panel">
-          <PanelTitle
-            title="Who still needs to pay"
-            subtitle="Unpaid entry and weekly fees. Loans are separate."
-            right={
-              <button
-                className="text-button"
-                onClick={() => workspace.go("Members", { memberTab: "dues" })}
-              >
-                {t("View all")}
-                <ArrowRight size={14} />
-              </button>
-            }
-          />
-          {pending.length ? (
-            pending.slice(0, 4).map((m, i) => (
-              <button
-                className="due-row balance-row"
-                key={m.id}
-                onClick={() => onOpenMember(m)}
-              >
-                <Avatar name={m.name} index={i} />
-                <span className="due-member">
-                  <strong>{m.name}</strong>
-                  <small>
-                    {Math.round(
-                      (workspace.totals.members[m.id].credit /
-                        Math.max(1, workspace.totals.members[m.id].assigned)) *
-                        100,
-                    )}
-                    {t("% paid")}
-                  </small>
-                </span>
-                <strong className="due-amount">
-                  {money(totals.members[m.id].outstanding)}
-                </strong>
-              </button>
-            ))
-          ) : (
-            <Empty title="All caught up" text="No outstanding member dues." />
-          )}
-        </section>
+  const { data, totals, my } = workspace;
+  const position = my ? memberPosition(data, my.id, !readOnly && my.is_me) : null;
+  return <div className="notebook-home">
+    <section className="panel notebook-section">
+      <div className="notebook-heading">
+        <h3>{t("My money")}</h3>
+        <label className="profile-choice">
+          <span className="sr-only">{t("Choose your member profile")}</span>
+          <select aria-label={t("Choose your member profile")} value={my?.id || ""}
+            onChange={event => workspace.setPersonalMember(event.target.value)}>
+            <option value="">{t("Choose your member profile")}</option>
+            {data.members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
+          </select>
+        </label>
       </div>
-
-      <div className="home-col">
-        {myBalance && my && (
-          <section className="panel">
-            <PanelTitle
-              title="My balance"
-              subtitle="Your fees and what the club owes you."
-            />
-            <div className="settings-body" style={{ paddingTop: 4 }}>
-              <div className="statement-split">
-                <div>
-                  <span>{t("Still due")}</span>
-                  <strong>{money(myBalance.outstanding)}</strong>
-                </div>
-                <div>
-                  <span>{t("Club owes me")}</span>
-                  <strong>{money(myBalance.loans)}</strong>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Recent transactions */}
-        <section className="panel">
-          <PanelTitle
-            title="Recent transactions"
-            subtitle="The latest from your ledger."
-            right={
-              <button
-                className="text-button"
-                onClick={() => workspace.go("Transactions")}
-              >
-                {t("View all")}
-                <ArrowRight size={14} />
-              </button>
-            }
-          />
-          <TxList
-            ledger={data}
-            rows={recent}
-            onOpen={workspace.query.isLoading ? undefined : onOpenTx}
-          />
-        </section>
-      </div>
-
-      {my && readOnly && myBalance && myBalance.loans > 0 && (
-        <p className="form-hint" style={{ margin: "0 2px" }}>
-          {t("Loan repayments are recorded by the administrator.")}
-        </p>
-      )}
-
-      {!readOnly && myBalance && myBalance.loans > 0 && (
-        <button className="debt-banner" onClick={onOpenLoans}>
-          <HandCoins size={22} />
-          <span>
-            <strong>
-              {t("The club owes you {amount}", {
-                amount: money(myBalance.loans),
-              })}
-            </strong>
-            <small>{t("Tap to see who is owed and record repayments.")}</small>
-          </span>
-          <ChevronRight size={18} />
+      {my && position ? <>
+        <button className="notebook-total" onClick={() => onOpenMember(my)}>
+          <span>{t("Total paid so far")}</span><strong>{money(position.totalPaid)}</strong><ChevronRight size={18}/>
         </button>
-      )}
-    </div>
-  );
+        <div className="notebook-line"><span>{t("Counts toward my fees")}</span><strong>{money(position.feePaid)}</strong></div>
+        <button className="notebook-line" onClick={() => onOpenMember(my)}><span>{t("I still need to pay")}</span><strong>{money(position.due)}</strong></button>
+        <button className="notebook-line" onClick={onOpenLoans}><span>{t("Club owes me")}</span><strong>{money(position.loan)}</strong></button>
+        {position.unrecorded > 0 && <div className="notebook-note">{t("Cash spending exceeds recorded funding by {amount}. Record your missing loan or payment to include it in your totals.", {amount: money(position.unrecorded)})}</div>}
+        {!readOnly && my.is_me && <div className="notebook-line"><span>{t("My money used")}</span><strong>{money(position.collectorMoneyUsed)}</strong></div>}
+        <details className="notebook-details"><summary>{t("How my money adds up")}</summary>
+          <div className="notebook-line"><span>{t("Cash given")}</span><strong>{money(position.cashPaid)}</strong></div>
+          <div className="notebook-line"><span>{t("Spent personally")}</span><strong>{money(position.personalSpent)}</strong></div>
+          <div className="notebook-line"><span>{t("Already repaid by club")}</span><strong>{money(position.repaid)}</strong></div>
+          <div className="notebook-line"><span>{t("My money still in the club")}</span><strong>{money(position.netPaid)}</strong></div>
+          {!readOnly && my.is_me && <>
+            <div className="notebook-line"><span>{t("Cash expenses")}</span><strong>{money(position.cashExpenses)}</strong></div>
+            <div className="notebook-line"><span>{t("Cash from everyone else")}</span><strong>{money(position.otherCash)}</strong></div>
+            <div className="notebook-line"><span>{t("Cash left")}</span><strong>{money(position.cashRemaining)}</strong></div>
+            <div className="notebook-line"><span>{t("Repaid to other members")}</span><strong>{money(position.repaidOthers)}</strong></div>
+            <p className="notebook-note">{t("Cash left and repayments are included. Other members’ personal purchases are separate from cash expenses.")}</p>
+          </>}
+        </details>
+      </> : <p className="notebook-note">{t("Choose your name to see your payments, loans and dues. This choice is saved for your account on this device.")}</p>}
+    </section>
+    {!readOnly && <div className="notebook-actions">
+      <button className="button primary" onClick={onRecordPayment}><Plus size={18}/>{t("Collect money")}</button>
+      <button className="button secondary" onClick={onOpenAddExpense}><Plus size={18}/>{t("Add expense")}</button>
+    </div>}
+    <section className="panel notebook-section">
+      <div className="notebook-heading"><h3>{t("Who paid how much")}</h3></div>
+      <div className="notebook-members-head"><span>{t("Members")}</span><span>{t("Total paid")}</span><span>{t("Still due")}</span></div>
+      {data.members.map((member, i) => {
+        const p = memberPosition(data, member.id);
+        return <button className="notebook-member" key={member.id} onClick={() => onOpenMember(member)}>
+          <span className="notebook-name"><Avatar name={member.name} index={i} size="sm"/><span>{member.name}{member.id === my?.id ? ` (${t("You")})` : ""}</span></span>
+          <strong>{money(p.totalPaid)}</strong><span>{money(p.due)}</span>
+        </button>;
+      })}
+      {!data.members.length && <p className="notebook-note">{t("No members yet")}</p>}
+    </section>
+    <section className="panel notebook-section">
+      <button className="notebook-line" onClick={onOpenCash}><span>{t("Cash in hand")}</span><strong>{money(totals.funds)}</strong></button>
+      <div className="notebook-line"><span>{t("Total spent")}</span><strong>{money(totals.expenses)}</strong></div>
+      <button className="notebook-line" onClick={onOpenLoans}><span>{t("Club debt")}</span><strong>{money(totals.loans)}</strong></button>
+    </section>
+  </div>;
 }

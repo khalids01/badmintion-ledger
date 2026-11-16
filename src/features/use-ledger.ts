@@ -103,7 +103,18 @@ export function useLedger(
   const data = query.data || empty;
   const totals = useMemo(() => calculate(data), [data]);
   const cash = useMemo(() => cashMovement(data.transactions), [data]);
-  const my = isAdmin ? data.members.find((m) => m.is_me) : undefined;
+  const [personalProfile, setPersonalProfile] = useState<{ account: string; member: string } | null>(null);
+  const profileKey = `ledger-personal-member:${session?.user.id || ""}`;
+  let savedMember = "";
+  try { savedMember = localStorage.getItem(profileKey) || ""; } catch { /* Optional storage. */ }
+  const personalId = personalProfile && personalProfile.account === session?.user.id ? personalProfile.member : savedMember;
+  const my = data.members.find(m => m.id === personalId) ||
+    (isAdmin ? data.members.find(m => m.is_me) : undefined);
+  function setPersonalMember(member: string) {
+    if (!session) return;
+    setPersonalProfile({ account: session.user.id, member });
+    try { localStorage.setItem(profileKey, member); } catch { /* Optional storage. */ }
+  }
   const activeMembers = data.members.filter((m) => m.is_active);
   const pending = useMemo(
     () =>
@@ -361,6 +372,7 @@ export function useLedger(
     totals,
     cash,
     my,
+    setPersonalMember,
     activeMembers,
     pending,
     filtered,

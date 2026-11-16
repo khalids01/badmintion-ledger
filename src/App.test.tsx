@@ -123,13 +123,14 @@ describe("ledger workflows", () => {
     await mount();
     expect(screen.queryByText(/Interactive preview/)).toBeNull();
     expect(screen.getByText("Cash in hand")).toBeTruthy();
-    expect(screen.getByText("৳7,400")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Cash in hand/ }).textContent).toContain("৳7,400");
   });
-  it("shows the cash hero and app branding on the home screen", async () => {
+  it("shows personal money first and keeps reports available", async () => {
     const u = userEvent.setup();
     await mount();
     expect(screen.getByText("Cash in hand")).toBeTruthy();
-    expect(screen.getByText(/Actual cash available/)).toBeTruthy();
+    expect(screen.getByText("Total paid so far")).toBeTruthy();
+    expect(screen.getByText("Who paid how much")).toBeTruthy();
     await u.click(screen.getAllByText("Reports", { exact: true })[0]);
     expect(screen.getByText(/Weekly cash received and spent/)).toBeTruthy();
     const selector = screen.getByLabelText("Chart weeks") as HTMLSelectElement;
@@ -161,7 +162,7 @@ describe("ledger workflows", () => {
     await u.selectOptions(screen.getByLabelText("Member"), "m0");
     await u.type(screen.getByLabelText("Description"), "Test contribution");
     await u.click(screen.getByText("Save transaction"));
-    expect(screen.getByText("৳7,900")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Cash in hand/ }).textContent).toContain("৳7,900");
     await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
     expect(screen.getByText("Test contribution")).toBeTruthy();
   });
@@ -177,7 +178,8 @@ describe("ledger workflows", () => {
       "700",
     );
     await u.click(screen.getByText("Assign dues to 1 members"));
-    expect(screen.getByText("৳3,700")).toBeTruthy();
+    expect(calculate(store.data!).members["m2"].assigned).toBe(270000);
+    expect(screen.getByRole("button", { name: /Fahim Rahman/ }).textContent).toContain("৳1,200");
   });
   it("prevents excessive loan repayment", async () => {
     const u = userEvent.setup();
@@ -202,7 +204,7 @@ describe("ledger workflows", () => {
     await u.type(screen.getByLabelText("Reason"), "Duplicate court entry");
     await u.click(screen.getByText("Confirm void transaction"));
     await u.click(screen.getAllByText("Home", { exact: true })[0]);
-    expect(screen.getByText("৳9,800")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Cash in hand/ }).textContent).toContain("৳9,800");
   });
   it("exports transactions through a CSV download", async () => {
     const create = vi.fn(() => "blob:ledger-export"),
@@ -295,7 +297,7 @@ describe("balance explanations", () => {
     await u.click(screen.getByRole("button", { name: /Cash in hand/ }));
     expect(await screen.findByText("Cash received from members")).toBeTruthy();
     await u.click(screen.getByLabelText("Close"));
-    await u.click(screen.getByRole("button", { name: /Club must repay/ }));
+    await u.click(screen.getByRole("button", { name: /Club debt/ }));
     expect(await screen.findByText("Who must the club repay?")).toBeTruthy();
   });
   it("opens the member-funded purchase form from Add expense", async () => {
@@ -481,4 +483,19 @@ describe("member navigation and read-only permissions", () => {
       within(txDetail).getByText(/Only the administrator can edit or void/),
     ).toBeTruthy();
   });
+});
+
+it("remembers a viewer's chosen profile without changing the shared admin profile", async () => {
+  store.admin = false;
+  const u = userEvent.setup();
+  const view = await mount();
+  expect(screen.queryByText("Total paid so far")).toBeNull();
+  await u.selectOptions(screen.getByLabelText("Choose your member profile"), "m1");
+  expect(screen.getByText("Total paid so far")).toBeTruthy();
+  expect(localStorage.getItem("ledger-personal-member:demo")).toBe("m1");
+  expect(store.data!.members.find(m => m.is_me)?.id).toBe("m0");
+  expect(screen.queryByRole("button", { name: "Collect money" })).toBeNull();
+  view.unmount();
+  await mount();
+  expect((screen.getByLabelText("Choose your member profile") as HTMLSelectElement).value).toBe("m1");
 });

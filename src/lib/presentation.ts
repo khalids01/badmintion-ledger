@@ -1,5 +1,5 @@
 import { t as translate } from "./i18n";
-import { day, minor } from "./accounting";
+import { calculate, day, minor } from "./accounting";
 import type { Ledger, Transaction } from "./types";
 
 const memberNotes = (notes: string | null | undefined) => notes || "";
@@ -100,4 +100,31 @@ export function linkedRepayments(data: Ledger, transaction: Transaction) {
       !row.voided_at &&
       row.notes?.match(linkPattern)?.[1] === transaction.id,
   );
+}
+
+// Recorded money only: missing funding is surfaced, never silently assigned as debt.
+export function memberPosition(data: Ledger, memberId: string, collector = false) {
+  const totals = calculate(data);
+  const balance = totals.members[memberId];
+  const cashPaid = memberCashPaid(data, memberId);
+  const movement = cashMovement(data.transactions);
+  return {
+    cashPaid,
+    personalSpent: balance.purchases,
+    totalPaid: cashPaid + balance.purchases,
+    feePaid: balance.credit,
+    due: balance.outstanding,
+    loan: balance.loans,
+    repaid: balance.repaid,
+    netPaid: cashPaid + balance.purchases - balance.repaid,
+    cashExpenses: movement.cashExpenses,
+    otherCash: movement.cashIn - cashPaid,
+    cashRemaining: Math.max(0, totals.funds),
+    repaidOthers: movement.cashOut - movement.cashExpenses - balance.repaid,
+    collectorMoneyUsed: movement.cashExpenses - (movement.cashIn - cashPaid)
+      + Math.max(0, totals.funds)
+      + (movement.cashOut - movement.cashExpenses - balance.repaid)
+      + balance.purchases,
+    unrecorded: collector ? Math.max(0, -totals.funds) : 0,
+  };
 }
