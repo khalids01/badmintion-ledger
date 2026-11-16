@@ -1,3 +1,4 @@
+import { ScreenshotButton } from "../components/screenshot-button";
 import { t } from "../lib/i18n";
 import { LanguageControl } from "./language";
 import { ThemeControl } from "./theme";
@@ -87,12 +88,15 @@ export function AppShellNav({
           />
         ))}
         {canAdd && onAdd ? (
-          <button className="fab-add" aria-label={t("Add")} onClick={onAdd}>
-            <Plus size={26} strokeWidth={2.5} />
+          <button
+            className="fab-add"
+            aria-label={t("Add")}
+            onClick={onAdd}
+            data-capture-exclude="true"
+          >
+            <Plus size={30} strokeWidth={2.4} />
           </button>
-        ) : (
-          <span className="fab-gap" aria-hidden="true" />
-        )}
+        ) : null}
         {navItems.slice(2).map(([name, Icon]) => (
           <TabButton
             key={name}
@@ -127,6 +131,7 @@ export function HeaderActions({
 }) {
   return (
     <div className="top-actions">
+      <ScreenshotButton compact />
       <ThemeControl compact />
       <LanguageControl compact />
       {canGoSettings && (

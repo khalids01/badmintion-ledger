@@ -2,6 +2,26 @@ import { t as translate } from "./i18n";
 import { day, minor } from "./accounting";
 import type { Ledger, Transaction } from "./types";
 
+const memberNotes = (notes: string | null | undefined) => notes || "";
+const temporaryPattern = /(?:^|\n)\[Temporary member\](?:\n|$)/i;
+// Temporary members are stored with a hidden structured marker in notes so the
+// schema and backend stay unchanged. Stripping the marker before display keeps
+// user notes intact.
+export function isTemporaryMember(member: { notes?: string | null }) {
+  return temporaryPattern.test(member.notes || "");
+}
+export function withoutTemporaryMark(notes: string | null | undefined) {
+  return memberNotes(notes)
+    .replace(temporaryPattern, "\n")
+    .replace(/^\n+|\n+$/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+export function withTemporaryMark(notes: string) {
+  const cleaned = withoutTemporaryMark(notes);
+  return cleaned ? cleaned + "\n[Temporary member]" : "[Temporary member]";
+}
+
 export function cashMovement(transactions: Transaction[]) {
   let cashIn = 0,
     cashOut = 0,
@@ -66,5 +86,18 @@ export function withLink(notes: string, id: string) {
 }
 export function linkedEntry(data: Ledger, transaction: Transaction) {
   const id = transaction.notes?.match(linkPattern)?.[1];
-  return id ? data.transactions.find((row) => row.id === id) : undefined;
+  return id
+    ? data.transactions.find((row) => row.id === id)
+    : linkedRepayments(data, transaction)[0];
+}
+// Reverse lookup: every non-voided loan_repayment that points at the given
+// transaction through the reciprocal link marker. Voided links are ignored so
+// a voided allocation never consumes the payment or lender balance.
+export function linkedRepayments(data: Ledger, transaction: Transaction) {
+  return data.transactions.filter(
+    (row) =>
+      row.type === "loan_repayment" &&
+      !row.voided_at &&
+      row.notes?.match(linkPattern)?.[1] === transaction.id,
+  );
 }

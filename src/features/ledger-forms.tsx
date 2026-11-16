@@ -15,9 +15,13 @@ import type {
 } from "../lib/types";
 import {
   isOriginalDateUnknown,
+  isTemporaryMember,
   linkedEntry,
+  linkedRepayments,
   withoutLink,
   withLink,
+  withTemporaryMark,
+  withoutTemporaryMark,
 } from "../lib/presentation";
 import { labels } from "../lib/labels";
 const txSchema = z
@@ -93,7 +97,9 @@ export function TransactionForm({
   initialPersonal?: boolean;
   initialMemberId?: string;
   busy: boolean;
-  onSave: (v: Record<string, unknown> | Record<string, unknown>[]) => void;
+  onSave: (
+    v: Record<string, unknown> | Record<string, unknown>[],
+  ) => void | boolean | Promise<void | boolean>;
   onVoid: () => void;
   onLinked?: (record: Transaction) => void;
 }) {
@@ -143,6 +149,27 @@ export function TransactionForm({
     crypto.randomUUID(),
   ]);
   const linked = record ? linkedEntry(data, record) : undefined;
+  const repaymentsOnRecord = record ? linkedRepayments(data, record) : [];
+  const safeMinor = (v: string) => {
+    try {
+      return minor(v);
+    } catch {
+      return 0;
+    }
+  };
+  const allocatedToRecord = repaymentsOnRecord.reduce(
+    (sum, row) => sum + safeMinor(String(row.amount)),
+    0,
+  );
+  const recordAmount = record ? safeMinor(String(record.amount)) : 0;
+  const remainingPayment = Math.max(0, recordAmount - allocatedToRecord);
+  const applyCandidate =
+    !!record && record.type === "contribution" && !record.voided_at;
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyId] = useState(() => crypto.randomUUID());
+  const [applyMember, setApplyMember] = useState("");
+  const [applyAmount, setApplyAmount] = useState("");
+  const [applyError, setApplyError] = useState("");
   const kind = watch("type"),
     personal =
       kind === "expense" && watch("funding_source") === "member_personal",
@@ -177,6 +204,71 @@ export function TransactionForm({
   }
   const lenderBalance = summary.members[repayMember]?.loans || 0;
   const lenderName = data.members.find((m) => m.id === repayMember)?.name || "";
+  const applyLenderBalance = applyMember
+    ? summary.members[applyMember]?.loans || 0
+    : 0;
+  async function submitApplyRepayment() {
+    if (!record) return;
+    setApplyError("");
+    if (!applyMember) {
+      setApplyError("Choose a lender with an outstanding loan");
+      return;
+    }
+    let cents = 0;
+    try {
+      cents = minor(applyAmount);
+    } catch {
+      setApplyError("Enter a valid amount greater than zero");
+      return;
+    }
+    if (cents <= 0) {
+      setApplyError("Enter a valid amount greater than zero");
+      return;
+    }
+    if (cents > remainingPayment) {
+      setApplyError(
+        t(
+          "Repayment cannot exceed the remaining unapplied payment of {amount}",
+          {
+            amount: money(remainingPayment),
+          },
+        ),
+      );
+      return;
+    }
+    if (applyLenderBalance <= 0) {
+      setApplyError("Choose a lender with an outstanding loan");
+      return;
+    }
+    if (cents > applyLenderBalance) {
+      setApplyError(
+        t("Repayment cannot exceed the remaining loan of {amount}", {
+          amount: money(applyLenderBalance),
+        }),
+      );
+      return;
+    }
+    const repayment: Record<string, unknown> = {
+      id: applyId,
+      type: "loan_repayment",
+      amount: applyAmount,
+      transaction_date: today() + "T12:00:00+06:00",
+      member_id: applyMember,
+      paid_by_member_id: null,
+      category_id: null,
+      funding_source: null,
+      personal_settlement: null,
+      payment_method: record.payment_method || "cash",
+      description: t("Loan repaid from {name}'s payment", {
+        name: data.members.find((m) => m.id === record.member_id)?.name || "",
+      }),
+      notes: withLink("", record.id),
+    };
+    const done = await onSave(repayment);
+    if (done === false) return;
+    setApplyOpen(false);
+    setApplyAmount("");
+  }
   const nextCash =
     summary.funds -
     (useRepayment ? repayAmount : 0) +
@@ -275,6 +367,119 @@ export function TransactionForm({
             </button>
           )}
           <small>{t("Editing or voiding changes only this entry.")}</small>
+        </div>
+      )}
+      {applyCandidate && !record?.voided_at && (
+        <div className="repayment-choice">
+          {repaymentsOnRecord.length > 0 && (
+            <div className="info-box">
+              <span>
+                {t("Applied to loan repayments:")} {money(allocatedToRecord)}
+              </span>
+              <small>
+                {t("Remaining of this payment: {amount}", {
+                  amount: money(remainingPayment),
+                })}
+              </small>
+              {repaymentsOnRecord.map((row) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  className="text-button"
+                  onClick={() => onLinked?.(row)}
+                >
+                  {t("View repayment to {name} · {amount}", {
+                    name:
+                      data.members.find((m) => m.id === row.member_id)?.name ||
+                      "",
+                    amount: money(minor(String(row.amount))),
+                  })}
+                </button>
+              ))}
+            </div>
+          )}
+          {!applyOpen ? (
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                setApplyOpen(true);
+                setApplyError("");
+                if (!applyAmount && remainingPayment > 0)
+                  setApplyAmount(String(remainingPayment / 100));
+                if (!applyMember) {
+                  const first = data.members.find(
+                    (m) => summary.members[m.id]?.loans > 0,
+                  );
+                  if (first) setApplyMember(first.id);
+                }
+              }}
+              disabled={remainingPayment <= 0 || summary.loans <= 0}
+            >
+              {t("Apply to loan repayment")}
+            </button>
+          ) : (
+            <>
+              <label>
+                {t("Repay to")}
+                <select
+                  aria-label={t("Repay to")}
+                  value={applyMember}
+                  onChange={(e) => {
+                    setApplyMember(e.target.value);
+                    setApplyError("");
+                  }}
+                >
+                  <option value="">{t("Choose a lender")}</option>
+                  {data.members
+                    .filter((m) => summary.members[m.id]?.loans > 0)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} · {money(summary.members[m.id].loans)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                {t("Repayment amount (BDT)")}
+                <input
+                  aria-label={t("Repayment amount (BDT)")}
+                  inputMode="decimal"
+                  value={applyAmount}
+                  onChange={(e) => {
+                    setApplyAmount(e.target.value);
+                    setApplyError("");
+                  }}
+                />
+              </label>
+              {applyError && <em>{t(applyError)}</em>}
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    setApplyOpen(false);
+                    setApplyError("");
+                  }}
+                >
+                  {t("Cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={busy}
+                  onClick={() => void submitApplyRepayment()}
+                >
+                  {busy ? t("Saving…") : t("Save repayment")}
+                </button>
+              </div>
+            </>
+          )}
+          {remainingPayment <= 0 && (
+            <p className="form-hint">
+              {t("This payment is already fully applied to loan repayments.")}
+            </p>
+          )}
         </div>
       )}
       <details className="form-guide">
@@ -551,6 +756,7 @@ const memberSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   phone: z.string().max(40),
   notes: z.string().max(2000),
+  membership_type: z.enum(["regular", "temporary"]),
   is_me: z.boolean(),
   is_active: z.boolean(),
 });
@@ -572,7 +778,10 @@ export function MemberForm({
     defaultValues: {
       name: record?.name || "",
       phone: record?.phone || "",
-      notes: record?.notes || "",
+      notes: withoutTemporaryMark(record?.notes),
+      membership_type: isTemporaryMember(record || {})
+        ? "temporary"
+        : "regular",
       is_me: record?.is_me || false,
       is_active: record?.is_active ?? true,
     },
@@ -580,9 +789,18 @@ export function MemberForm({
   return (
     <form
       className="form"
-      onSubmit={handleSubmit((v) =>
-        onSave({ ...v, phone: v.phone || null, notes: v.notes || null }),
-      )}
+      onSubmit={handleSubmit((v) => {
+        const { membership_type, ...rest } = v;
+        const cleaned = rest.notes.trim();
+        onSave({
+          ...rest,
+          phone: rest.phone || null,
+          notes:
+            membership_type === "temporary"
+              ? withTemporaryMark(cleaned)
+              : cleaned || null,
+        });
+      })}
     >
       <label>
         {t("Full name")}
@@ -597,6 +815,35 @@ export function MemberForm({
         {t("Phone (optional)")}
         <input type="tel" {...register("phone")} />
       </label>
+      <fieldset className="choice-group">
+        <legend>{t("Membership")}</legend>
+        <label className="radio">
+          <input
+            type="radio"
+            value="regular"
+            {...register("membership_type")}
+          />
+          <span>
+            <strong>{t("Regular member")}</strong>
+            <small>{t("Charged entry or weekly fees.")}</small>
+          </span>
+        </label>
+        <label className="radio">
+          <input
+            type="radio"
+            value="temporary"
+            {...register("membership_type")}
+          />
+          <span>
+            <strong>{t("Temporary player")}</strong>
+            <small>
+              {t(
+                "Pays any amount with no obligatory fees. Kept out of dues by default.",
+              )}
+            </small>
+          </span>
+        </label>
+      </fieldset>
       <label>
         {t("Notes")}
         <textarea {...register("notes")} />
@@ -640,7 +887,10 @@ export function DuesForm({
       weeklyTitles.length,
       ...weeklyTitles.map((t) => Number(t.match(/week\s+(\d+)/i)?.[1] || 0)),
     ) + 1;
-  const [selected, setSelected] = useState<string[]>(members.map((m) => m.id)),
+  const regularIds = members
+    .filter((m) => !isTemporaryMember(m))
+    .map((m) => m.id);
+  const [selected, setSelected] = useState<string[]>(regularIds),
     [amount, setAmount] = useState(""),
     [custom, setCustom] = useState<Record<string, string>>({}),
     [title, setTitle] = useState(`Weekly fee — Week ${nextWeek}`),
@@ -681,6 +931,9 @@ export function DuesForm({
           onClick={() => {
             setTitle("Entry fee");
             setAmount("500");
+            setSelected((current) =>
+              current.filter((id) => regularIds.includes(id)),
+            );
           }}
         >
           {t("Entry fee · ৳500")}
@@ -727,12 +980,22 @@ export function DuesForm({
       <label className="checkbox">
         <input
           type="checkbox"
-          checked={selected.length === members.length}
+          checked={
+            regularIds.length > 0 &&
+            regularIds.every((id) => selected.includes(id))
+          }
           onChange={(e) =>
-            setSelected(e.target.checked ? members.map((m) => m.id) : [])
+            setSelected(
+              e.target.checked
+                ? [
+                    ...selected.filter((id) => !regularIds.includes(id)),
+                    ...regularIds,
+                  ]
+                : selected.filter((id) => !regularIds.includes(id)),
+            )
           }
         />
-        {t("Select all active members")}
+        {t("Select all regular members")}
       </label>
       <div className="dues-selection">
         {members.map((m) => (
@@ -750,6 +1013,11 @@ export function DuesForm({
                 }
               />
               {m.name}
+              {isTemporaryMember(m) && (
+                <span className="badge neutral temporary-badge">
+                  {t("Temporary")}
+                </span>
+              )}
             </label>
             <input
               aria-label={t("Custom amount for {name}", { name: m.name })}

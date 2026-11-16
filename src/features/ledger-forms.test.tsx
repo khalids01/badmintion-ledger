@@ -4,7 +4,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TransactionForm, DuesForm } from "./ledger-forms";
 import { demo } from "../test/ledger-fixture";
-import { today } from "../lib/accounting";
+import { withLink, withTemporaryMark } from "../lib/presentation";
+import { calculate, today } from "../lib/accounting";
 afterEach(cleanup);
 describe("optional expense dates", () => {
   it("uses today when the expense date is cleared", async () => {
@@ -213,4 +214,138 @@ describe("payment used to repay a loan", () => {
     );
     expect(Array.isArray(save.mock.calls[0][0])).toBe(false);
   });
+});
+
+describe("repayment from a recorded payment", () => {
+  it("inserts only a 500 repayment, leaving the original payer credited", async () => {
+    const u = userEvent.setup(),
+      save = vi.fn(
+        async (value: Record<string, unknown> | Record<string, unknown>[]) => {
+          void value;
+          return true;
+        },
+      );
+    const record = {
+      ...demo.transactions[0],
+      id: crypto.randomUUID(),
+      amount: 500,
+      member_id: "m2",
+    };
+    const data = { ...demo, transactions: [...demo.transactions, record] };
+    render(
+      <TransactionForm
+        data={data}
+        type="contribution"
+        record={record}
+        busy={false}
+        onSave={save}
+        onVoid={() => {}}
+      />,
+    );
+    await u.click(screen.getByText("Apply to loan repayment"));
+    await u.click(screen.getByText("Save repayment"));
+    const repayment = save.mock.calls[0][0];
+    expect(Array.isArray(repayment)).toBe(false);
+    expect(repayment).toMatchObject({
+      type: "loan_repayment",
+      member_id: "m0",
+      amount: "500",
+      payment_method: "mobile_wallet",
+    });
+    const result = calculate({
+      ...data,
+      transactions: [
+        ...data.transactions,
+        repayment as unknown as typeof record,
+      ],
+    });
+    expect(result.members.m0.loans).toBe(150000);
+    expect(result.members.m2.credit).toBe(200000);
+    expect(result.funds).toBe(calculate(data).funds - 50000);
+    expect(record.amount).toBe(500);
+  });
+  it("excludes voided allocations and rejects use above remaining payment", async () => {
+    const u = userEvent.setup(),
+      save = vi.fn();
+    const record = {
+      ...demo.transactions[0],
+      id: crypto.randomUUID(),
+      amount: 500,
+    };
+    const allocation = {
+      ...demo.transactions[0],
+      id: crypto.randomUUID(),
+      type: "loan_repayment" as const,
+      amount: 300,
+      notes: withLink("", record.id),
+    };
+    const data = {
+      ...demo,
+      transactions: [
+        ...demo.transactions,
+        record,
+        allocation,
+        {
+          ...allocation,
+          id: crypto.randomUUID(),
+          amount: 100,
+          voided_at: record.created_at,
+        },
+      ],
+    };
+    render(
+      <TransactionForm
+        data={data}
+        type="contribution"
+        record={record}
+        busy={false}
+        onSave={save}
+        onVoid={() => {}}
+      />,
+    );
+    await u.click(screen.getByText("Apply to loan repayment"));
+    expect(
+      (screen.getByLabelText("Repayment amount (BDT)") as HTMLInputElement)
+        .value,
+    ).toBe("200");
+    await u.clear(screen.getByLabelText("Repayment amount (BDT)"));
+    await u.type(screen.getByLabelText("Repayment amount (BDT)"), "201");
+    await u.click(screen.getByText("Save repayment"));
+    expect(save).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/cannot exceed the remaining unapplied/),
+    ).toBeTruthy();
+  });
+});
+it("leaves temporary players out of default fee assignments and entry presets", async () => {
+  const u = userEvent.setup(),
+    save = vi.fn();
+  const members = demo.members.map((m, i) =>
+    i === 0 ? { ...m, notes: withTemporaryMark("Guest") } : m,
+  );
+  render(<DuesForm members={members} busy={false} onSave={save} />);
+  expect(
+    (
+      screen.getByRole("checkbox", {
+        name: new RegExp(members[0].name),
+      }) as HTMLInputElement
+    ).checked,
+  ).toBe(false);
+  await u.click(
+    screen.getByRole("checkbox", { name: new RegExp(members[0].name) }),
+  );
+  await u.click(screen.getByText("Entry fee · ৳500"));
+  expect(
+    (
+      screen.getByRole("checkbox", {
+        name: new RegExp(members[0].name),
+      }) as HTMLInputElement
+    ).checked,
+  ).toBe(false);
+  await u.click(screen.getByText("Assign dues to 5 members"));
+  expect(
+    save.mock.calls[0][0].some(
+      (row: { member_id: string }) => row.member_id === members[0].id,
+    ),
+  ).toBe(false);
 });

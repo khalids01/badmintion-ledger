@@ -1,6 +1,7 @@
+import { ScreenshotButton } from "./screenshot-button";
 import { t } from "../lib/i18n";
 import { calculate, money } from "../lib/accounting";
-import { memberCashPaid } from "../lib/presentation";
+import { memberCashPaid, isTemporaryMember } from "../lib/presentation";
 import { Avatar, MemberBadge } from "./ui-kit";
 import { MemberStatement } from "./member-statement";
 import { HandCoins, Pencil, CreditCard } from "lucide-react";
@@ -27,10 +28,18 @@ export function MemberDetail({
 
   return (
     <div className="member-statement">
+      <ScreenshotButton />
       <div className="member-detail-hero">
         <Avatar name={member.name} size="lg" index={index} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h3>{member.name}</h3>
+          <h3>
+            {member.name}
+            {isTemporaryMember(member) && (
+              <span className="badge neutral temporary-badge">
+                {t("Temporary")}
+              </span>
+            )}
+          </h3>
           <p>
             {member.phone || t("Club member")}
             {" · "}

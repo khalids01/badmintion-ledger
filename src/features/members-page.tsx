@@ -4,6 +4,7 @@ import { Avatar, PanelTitle, Empty, MemberBadge } from "../components/ui-kit";
 import type { LedgerWorkspace } from "./use-ledger";
 import type { Member } from "../lib/types";
 import { Search, ChevronRight, Plus } from "lucide-react";
+import { isTemporaryMember } from "../lib/presentation";
 
 export function MembersPage({
   workspace,
@@ -84,7 +85,14 @@ export function MembersPage({
                 onClick={() => onOpenMember(m)}
               >
                 <Avatar name={m.name} index={i} size="sm" />
-                <strong>{m.name}</strong>
+                <strong>
+                  {m.name}
+                  {isTemporaryMember(m) && (
+                    <span className="badge neutral temporary-badge">
+                      {t("Temporary")}
+                    </span>
+                  )}
+                </strong>
                 <MemberBadge
                   outstanding={b.outstanding}
                   assigned={b.assigned}
@@ -191,7 +199,14 @@ export function MembersPage({
             >
               <Avatar name={m.name} index={i} />
               <span className="member-main">
-                <strong>{m.name}</strong>
+                <strong>
+                  {m.name}
+                  {isTemporaryMember(m) && (
+                    <span className="badge neutral temporary-badge">
+                      {t("Temporary")}
+                    </span>
+                  )}
+                </strong>
                 <small>{m.phone || t("Club member")}</small>
               </span>
               <span className="member-due">

@@ -115,13 +115,13 @@ export function SettingsPage({
                 onClick={onExportTransactions}
               >
                 <Download size={16} />
-                {t("Export all transactions")}
+                {t("CSV export")}
               </button>
             )}
             {onExportMembers && (
               <button className="button secondary" onClick={onExportMembers}>
                 <Download size={16} />
-                {t("Member balances CSV")}
+                {t("CSV export")}
               </button>
             )}
           </div>

@@ -417,7 +417,17 @@ function App() {
               initialPersonal={edit.personal}
               initialMemberId={edit.memberId}
               busy={workspace.busy}
-              onSave={(v) => save("transactions", v, edit.record?.id)}
+              onSave={(v) => {
+                if (
+                  edit.record?.type === "contribution" &&
+                  !Array.isArray(v) &&
+                  v.type === "loan_repayment" &&
+                  v.id
+                ) {
+                  return workspace.save("transactions", v);
+                }
+                return save("transactions", v, edit.record?.id);
+              }}
               onLinked={(record) =>
                 setEdit({ kind: "transaction", type: record.type, record })
               }

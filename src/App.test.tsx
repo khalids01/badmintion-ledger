@@ -170,7 +170,7 @@ describe("ledger workflows", () => {
     await mount();
     await openAddOnSheet(u, /^Assign dues/);
     await u.type(screen.getByLabelText("Default amount (BDT)"), "500");
-    await u.click(screen.getByLabelText("Select all active members"));
+    await u.click(screen.getByLabelText("Select all regular members"));
     await u.click(screen.getByLabelText("Fahim Rahman"));
     await u.type(
       screen.getByLabelText("Custom amount for Fahim Rahman"),
@@ -221,7 +221,7 @@ describe("ledger workflows", () => {
     const u = userEvent.setup();
     await mount();
     await u.click(screen.getAllByText("Transactions", { exact: true })[0]);
-    await u.click(screen.getByText("Export CSV"));
+    await u.click(screen.getByText("CSV export"));
     expect(create).toHaveBeenCalledWith(expect.any(Blob));
     expect(click).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:ledger-export");

@@ -75,7 +75,7 @@ export function TransactionsPage({
         {onExport && (
           <button className="filter-toggle" onClick={onExport}>
             <Download size={16} />
-            {t("Export CSV")}
+            {t("CSV export")}
           </button>
         )}
         {advanced && (

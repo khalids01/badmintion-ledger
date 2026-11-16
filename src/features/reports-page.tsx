@@ -130,13 +130,13 @@ export function ReportsPage({
         {onExportTransactions && (
           <button className="button secondary" onClick={onExportTransactions}>
             <Download size={16} />
-            {t("Export CSV")}
+            {t("CSV export")}
           </button>
         )}
         {onExportMembers && (
           <button className="button secondary" onClick={onExportMembers}>
             <Download size={16} />
-            {t("Member balances CSV")}
+            {t("CSV export")}
           </button>
         )}
       </div>

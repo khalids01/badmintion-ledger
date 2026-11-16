@@ -55,3 +55,5 @@ npm run dev
 Open http://localhost:3000. Run `npm test`, `npm run lint`, and `npm run build` to check changes.
 
 [Publishing updates](docs/releases.md) · Database migrations: `supabase/migrations/`
+
+Temporary players can contribute any amount and are not selected by default for fee assignments. Existing payments have an **Apply to loan repayment** action; this adds only the repayment. **Screenshot** saves the current page or open details as a PNG, while **CSV export** downloads ledger data.
