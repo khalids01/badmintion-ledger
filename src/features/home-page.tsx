@@ -156,7 +156,7 @@ export function HomePage({
                 onClick={() => onOpenMember(m)}
               >
                 <Avatar name={m.name} index={i} />
-                <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="due-member">
                   <strong>{m.name}</strong>
                   <small>
                     {Math.round(
@@ -167,7 +167,7 @@ export function HomePage({
                     {t("% paid")}
                   </small>
                 </span>
-                <strong style={{ color: "var(--amber)" }}>
+                <strong className="due-amount">
                   {money(totals.members[m.id].outstanding)}
                 </strong>
               </button>

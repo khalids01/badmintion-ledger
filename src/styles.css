@@ -555,6 +555,13 @@ h1 {
   font-weight: 700;
   letter-spacing: -0.1px;
 }
+.panel-heading > div {
+  min-width: 0;
+}
+.panel-heading > .text-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .panel-heading p {
   font-size: 11px;
   color: var(--text-faint);
@@ -744,7 +751,7 @@ h1 {
 
 .quick-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 .quick-action {
@@ -759,6 +766,21 @@ h1 {
   text-align: left;
   border: 1px solid transparent;
   transition: transform 0.15s;
+  height: auto;
+  line-height: 1.45;
+  min-width: 0;
+}
+.quick-action > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .quick-action {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px;
+  }
 }
 .quick-action:active {
   transform: scale(0.97);
@@ -1227,6 +1249,24 @@ button.tx-row:hover {
   flex: 1;
   min-width: 0;
 }
+.due-member {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.due-member small {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.balance-row > .due-amount {
+  color: var(--amber);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  text-align: right;
+}
 .balance-amount {
   text-align: right;
   min-width: 96px;
@@ -1501,6 +1541,53 @@ button.tx-row:hover {
   height: 18px;
   min-height: 18px;
   accent-color: var(--teal);
+}
+.choice-group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.choice-group legend {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.form .choice-group .radio {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.choice-group .radio:has(input:checked) {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+.choice-group input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  margin: 2px 0 0;
+  accent-color: var(--teal);
+}
+.choice-group .radio span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.choice-group .radio strong {
+  color: var(--text);
+}
+.choice-group .radio small {
+  line-height: 1.5;
 }
 
 .live-preview {
@@ -2433,6 +2520,12 @@ button.tx-row:hover {
   flex: 0 0 64px;
   transform: translateY(-16px);
   margin-top: -16px;
+  color: var(--on-teal);
+}
+.mobile-nav .fab-add svg {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
 }
 .mobile-nav .fab-add:active {
   transform: translateY(-16px) scale(0.93);
